@@ -1,0 +1,9 @@
+{
+  "dimensions": [
+    {"name": "x",   "min": 0.7200,    "max": 1.1000,      "n_segments": 4},
+    {"name": "y",   "min": -0.300,    "max": 0.7550,      "n_segments": 4},
+    {"name": "θ",   "min":  0,        "max": 0,           "n_segments": 1}
+  ],
+  "initial_joint_config": [1.0434904, -0.22012624, -0.747048, 1.5243934, 1.8818109, -0.9687088, -0.49087385],
+  "n_objects": 1
+}

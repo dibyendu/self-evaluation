@@ -1,0 +1,39 @@
+.line-path {
+  stroke-width: 2;
+  fill: none;
+  stroke-linecap: round;
+}
+
+.joint-limits-line {
+  stroke-width: 2;
+  stroke-dasharray: 10;
+  opacity: 0.5;
+}
+
+.tick text {
+  fill: #635F5D;
+}
+
+.tick line {
+  stroke: #C0C0BB;
+}
+
+.axis-label {
+  fill: #8E8883;
+}
+.axis path,
+.axis line {
+  fill: none;
+  shape-rendering: crispEdges;
+}
+
+.y.axis path {
+  fill: none;
+  shape-rendering: crispEdges;
+}
+
+.brush .extent {
+  stroke: #fff;
+  fill-opacity: 0.125;
+  shape-rendering: crispEdges;
+}
