@@ -1,5 +1,7 @@
+import { resolve } from 'path'
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import { nodePolyfills } from 'vite-plugin-node-polyfills'
 
 const serverConfig = {
   host: 'localhost',
@@ -8,7 +10,16 @@ const serverConfig = {
 
 export default defineConfig({
   build: {
-    outDir: '../build'
+    outDir: '../frontend',
+    rollupOptions: {
+      input: {
+        main: resolve(__dirname, 'src', 'index.html'),
+        visualise: resolve(__dirname, 'src', 'visualise.html')
+      }
+    }
+  },
+  worker: {
+    format: 'es'
   },
   root: 'src',
   server: {
@@ -17,5 +28,8 @@ export default defineConfig({
   preview: {
     ...serverConfig
   },
-  plugins: [react()]
-})  
+  plugins: [
+    react(),
+    nodePolyfills({ include: ['module'] })
+  ]
+})
