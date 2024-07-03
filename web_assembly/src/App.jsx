@@ -10,6 +10,7 @@ import {
   demonstrationConfigurationFormat
 } from './Config'
 import naivePAC from './Bandit'
+import robotImageUrl from './img/robot_top_view.svg'
 import DropZone, { DropZoneWrapper } from './DropZone'
 
 
@@ -127,7 +128,7 @@ function PlanInfo({ style, position, plans }) {
                     <span className='material-symbols-rounded' style={{ cursor: 'pointer', verticalAlign: 'text-bottom' }} onClick={() => {
                       const state = { plan, position, screw_segments }
                       localStorage.setItem('navigation_state', JSON.stringify(state))
-                      window.open('/visualise', '_blank', 'noreferrer')
+                      window.open('/visualise.html', '_blank', 'noreferrer')
                     }}>
                       visibility
                     </span>
@@ -439,7 +440,7 @@ export default function App() {
                 }}
               >
                 <img
-                  src='img/robot_top_view.svg'
+                  src={robotImageUrl}
                   onLoad={({ target }) => setRobotImageDimensions({ width: target.width, height: target.height })}
                   style={{
                     position: 'absolute', zIndex: -1, opacity: 0.2,
@@ -523,7 +524,7 @@ export default function App() {
                         joint_angles = nj.array(joint_angles)
                         const state = { plan: joint_angles.slice(null, [1,8]).tolist(), timestamps: joint_angles.slice(null, [0,1]).tolist().flat(), position: [x, y, z] }                        
                         localStorage.setItem('navigation_state', JSON.stringify(state))
-                        window.open('/visualise', '_blank', 'noreferrer')
+                        window.open('/visualise.html', '_blank', 'noreferrer')
                       }}
                     >
                       {id}

@@ -12,6 +12,7 @@ import { OrbitControls } from 'https://esm.run/three/examples/jsm/controls/Orbit
 
 
 import './css/visualization.css'
+import imagePath from './img/baxter_arm.png'
 
 
 
@@ -20,8 +21,6 @@ const jointSpaceHeight = 260,
       robotImageWidthPercent = 22
 
 const jointNames = ['S0', 'S1', 'E0', 'E1', 'W0', 'W1', 'W2']
-
-const imagePath = './img/baxter_arm.png'
 
 const imageCircleMap = {
   'S0': { cx: 75, cy: 170, rx: 40, ry: 20, rotate: 0 },
