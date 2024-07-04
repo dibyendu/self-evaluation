@@ -14,3 +14,134 @@
 }
 
 @keyframes l4 {to{transform: rotate(1turn)}}
+
+.button {
+  background-color: #555;
+  border: none;
+  color: white;
+  padding: 10px 20px;
+  display: inline-flex;
+  align-items: center;
+  font-size: 18px;
+  cursor: pointer;
+  transition-duration: 0.4s;
+  border-radius: 5px;
+  box-shadow: 0 12px 16px 0 rgba(0,0,0,0.24),0 17px 50px 0 rgba(0,0,0,0.19);
+}
+
+.button.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.button:hover {
+  background-color: white;
+  color: #555;
+}
+
+
+.switch-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  color: #fff;
+}
+
+.switch-container.disabled {
+  opacity: 0.5;
+}
+
+.switch {
+  font-size: 0.875rem;
+  position: relative;
+  display: inline-block;
+  width: 20em;
+  height: 2.6em;
+}
+
+.switch input {
+  display: none;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.switch input:checked + .slider .ball {
+  box-shadow: 10px 10px 100px #7f8996;
+}
+
+.switch input:checked + .slider .title {
+  left: 40%;
+}
+
+.switch input:checked + .slider {
+  background-color: #26823a;
+}
+
+.switch input:focus + .slider {
+  box-shadow: 10px 10px 100px #7f8996;
+}
+
+.switch input:checked + .slider .ball {
+  left: 88%;
+  transform: rotate(360deg);
+  box-shadow: none;
+  outline: 6px solid rgba(255, 255, 255, 0.278);
+}
+
+.switch .slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #555;
+  transition: all 0.4s;
+  border-radius: 30px;
+}
+
+.switch .slider.disabled {
+  cursor: not-allowed;
+}
+
+.switch .slider .title {
+  width: max-content;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-weight: 600;
+  transition: all 0.4s;
+  -webkit-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+
+.switch .slider .ball {
+  background-color: #b3b3b3;
+  height: 36px;
+  width: 36px;
+  border-radius: 50%;
+  position: absolute;
+  left: -1px;
+  transition: 0.4s;
+}
+
+.switch .slider .ball .icon {
+  position: absolute;
+  top: 58%;
+  left: 53%;
+  transform: translate(-50%, -50%);
+  color: #313033;
+  font-size: 12px;
+}
+
+.switch .slider .ball .icon svg {
+  width: 24px;
+  height: 24px;
+  color: rgb(31 41 55);
+}

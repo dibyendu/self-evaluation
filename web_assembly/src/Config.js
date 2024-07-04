@@ -22,3 +22,6 @@ export const demonstrationFiles = {
   joint_angle: 'joint_angles.csv',
   roi: 'region_of_interest.txt'
 }
+
+
+export const backEndHost = 'http://127.0.0.1:8080'

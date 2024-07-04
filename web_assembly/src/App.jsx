@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState, useRef } from 'react'
 import nj from 'https://esm.run/numjs'
 
 
 import './css/style.css'
 import {
+  backEndHost,
   demonstrationFiles,
   robotConfigurationFiles,
   demonstrationConfigurationFile,
@@ -12,6 +13,13 @@ import {
 import naivePAC from './Bandit'
 import robotImageUrl from './img/robot_top_view.svg'
 import DropZone, { DropZoneWrapper } from './DropZone'
+
+
+
+
+const robotConfiguration = import.meta.glob('../../baxter_config/*.csv', { query: '?raw' })
+import demonstrationConfiguration from '../../demonstrations/Scoop_Interactive/config.json'
+
 
 
 
@@ -144,7 +152,61 @@ function PlanInfo({ style, position, plans }) {
 }
 
 
+function useAsyncAction () {
+  const [isPending, setPending] = useState(false)
+
+  const actionInitiator = async fn => {
+    setPending(true)
+    await fn()
+    setPending(false)
+  }
+
+  return [isPending, actionInitiator]
+}
+
+
+function Switch({ disabled, handleToggle }) {
+  const [active, setActive] = useState(false)
+
+  return (
+    <div className={`switch-container ${disabled ? 'disabled' : ''}`}>
+      <label className='switch'>
+        <input type='checkbox' checked={active} onChange={event => {
+          event.preventDefault()
+          handleToggle(active, () => setActive(!active))
+        }}/>
+        <span className={`slider ${disabled ? 'disabled' : ''}`}>
+          <span className='title'>{active ? 'Stop Taking Demonstration' : 'Start Taking Demonstration'}</span>
+          <span className='ball'>
+            <span className='icon'>
+              <svg
+                aria-hidden='true'
+                xmlns='http://www.w3.org/2000/svg'
+                width={25}
+                height={25}
+                fill='none'
+                viewBox='0 0 24 24'
+              >
+                <path
+                  stroke='currentColor'
+                  strokeLinecap='round'
+                  strokeLinejoin='round'
+                  strokeWidth={2}
+                  d='M8 18V6l8 6-8 6Z'
+                ></path>
+              </svg>
+            </span>
+          </span>
+        </span>
+      </label>
+    </div>
+  )
+}
+
+
 export default function App() {
+
+  const firstCellRef = useRef(null)
 
   const [demoConfigAvailable, setDemoConfigAvailable] = useState(false)
   const [robotConfigAvailable, setRobotConfigAvailable] = useState(false)
@@ -155,6 +217,7 @@ export default function App() {
   const [robotImageDimensions, setRobotImageDimensions] = useState({ width: 0, height: 0 })
 
   const [processing, setProcessing] = useState(false)
+  const [isPending, startAction] = useAsyncAction()
 
   const [probabilityHeatMap, setProbabilityHeatMap] = useState({})
   const [taskInstancesToRender, setTaskInstancesToRender] = useState([])
@@ -164,16 +227,23 @@ export default function App() {
   const [themeOpen, setThemeOpen] = useState(false)
   const [workSpaceTheme, setWorkSpaceTheme] = useState(defaultWorkSpaceTheme)
 
+  const [demonstrationProcessPID, setDemonstrationProcessPID] = useState(null)
+
+  const [userClickPose, setUserClickPose] = useState(null)
+  const [freezeUserClickPose, setFreezeUserClickPose] = useState(false)
+  const [showObjectPoseHint, setShowObjectPoseHint] = useState(true)
+
 
   const loadConfiguration = useCallback(fileMap => {
-    const worker = new Worker(new URL('file.worker.js', import.meta.url))
-    worker.postMessage(fileMap)
-    worker.onmessage = async ({ data: { result: fileData }}) => {
-      worker.terminate()
-      fileData.forEach(([name, data]) => localStorage.setItem(robotConfigurationFiles[name.match(/^(?:.*\/)?(.*)$/)[1]], data))
+    Promise.all(fileMap.map(async ([path, module]) => {
+      const data = (await module()).default
+      return [path.split('/').at(-1), data]
+    }))
+    .then(fileData => {
+      fileData.forEach(([file, data]) => localStorage.setItem(robotConfigurationFiles[file], data))
       setRobotConfigAvailable(true)
       console.log('Configuration files are loaded!')
-    }
+    })
   }, [])
 
 
@@ -207,35 +277,16 @@ export default function App() {
       {
         !robotConfigAvailable
         ?
-        <DropZone onlyDirectory icon='precision_manufacturing' text="Drop the robot's configuration files or directory here" getFiles={fileMap => {
-          const fileList = Object.entries(fileMap).filter(([_, file]) => Object.keys(robotConfigurationFiles).includes(file.name))
-          if (fileList.length !== Object.keys(robotConfigurationFiles).length) {
-            alert(`Upload the robot's configuration files or directory containing the follwing files:\n  ${Object.keys(robotConfigurationFiles).join('\n  ')}`)
-            return
-          }
-          loadConfiguration(Object.fromEntries(fileList))
-        }}/>
-        :
-        <>
-          {
-            !demoConfigAvailable
-            ?
-            <DropZone icon='grid_on' text='Drop demonstration configuration file here' getFiles={fileMap => {
-              const demoConfigFile = Object.entries(fileMap)
-                                     .filter(([_, file]) => !file.name.startsWith('.'))
-                                     .find(([_, file]) => file.name === demonstrationConfigurationFile)
-              if (demoConfigFile === undefined) {
-                alert(`The configuration file is missing:\n  ${demonstrationConfigurationFile}\nSample format:\n${JSON.stringify(demonstrationConfigurationFormat, null, 2)}`)
-                return
-              }
-              const reader = new FileReader()
-              reader.onerror = () => console.error('Error reading the file:', demoConfigFile[1].name)
-              reader.onload = ({ target: { result: data }}) => {
-                sessionStorage.setItem(demonstrationConfigurationFile, data)
-                const config = JSON.parse(data),
-                      { dimensions } = config
+        <button className={`button ${isPending ? 'disabled' : ''}`} onClick={() => {
+          if (isPending) return
+          startAction(() =>
+            fetch(`${backEndHost}/init`).then(response => {
+              if (response.ok) {
+                loadConfiguration(Object.entries(robotConfiguration))
+                sessionStorage.setItem(demonstrationConfigurationFile, JSON.stringify(demonstrationConfiguration))
+                const { dimensions } = demonstrationConfiguration
                 setWorkSpaceConfig({
-                  ...config,
+                  ...demonstrationConfiguration,
                   ...Object.assign(
                     ...dimensions
                     .filter(dimension => ['x', 'y'].some(name => name === dimension.name))
@@ -244,315 +295,326 @@ export default function App() {
                 })
                 setDemoConfigAvailable(true)
               }
-              reader.readAsText(demoConfigFile[1], 'UTF-8')
-            }}/>
-            :
-            <>
-              {!demonstrationAvailable ? <h3>Robot's Workspace</h3> : <h3>Robot's Belief</h3> }
-              <DropZoneWrapper
-                style={{ position: 'relative' }}
-                getFiles={fileMap => {
-                  const fileList = Object.entries(fileMap)
-                                   .filter(([_, file]) => !file.name.startsWith('.') && Object.values(demonstrationFiles).includes(file.name))
+            }).catch(error => alert(error))
+          )
+        }}>
+          Initialize the Robot
+          <span className='material-symbols-rounded' style={{ fontSize: 60, marginLeft: 10 }}>precision_manufacturing</span>
+        </button>
+        :
+        <>
+          <Switch disabled={isPending} handleToggle={(isActive, callBack) => {
+            if (isPending) return
+            if (!isActive) {
+              if (userClickPose === null) {
+                alert('Please click inside the workspace to set the object position before collecting the demonstration')
+                return
+              }
+              setFreezeUserClickPose(true)
+              startAction(() =>
+                fetch(`${backEndHost}/start`)
+                .then(response => {
+                  if (response.ok)
+                    return response.json()
+                })
+                .then(({ pid }) => setDemonstrationProcessPID(pid))
+                .catch(error => alert(error))
+                .finally(() => callBack())
+              )
+            } else {
+              startAction(() =>
+                fetch(`${backEndHost}/stop/${demonstrationProcessPID}`)
+                .then(response => {
+                  if (response.ok)
+                    return response.json()
+                })
+                .then(({ demonstration }) => {
+                  setUserClickPose(null)
+                  setShowObjectPoseHint(true)
+                  setFreezeUserClickPose(false)
 
-                  if (fileList.length === 0) {
-                    alert(`Upload the demonstration files or directory containing ONLY the follwing files:\n  ${Object.values(demonstrationFiles).join('\n  ')}`)
-                    return
-                  }
 
-                  const poseRegex = new RegExp(`^((?:.*\/)*?(?:.*?([0-9]+)\/)?)${demonstrationFiles.object_pose}$`),
-                        jointRegex = new RegExp(`^((?:.*\/)*?(?:.*?([0-9]+)\/)?)${demonstrationFiles.joint_angle}$`),
-                        roiRegex = new RegExp(`^((?:.*\/)*?(?:.*?([0-9]+)\/)?)${demonstrationFiles.roi}$`)
+                  const objectPose = nj.array([
+                    [ 1, 0, 0,  userClickPose.xx    ],
+                    [ 0, 1, 0,  userClickPose.yy    ],
+                    [ 0, 0, 1, -0.06447185171756116 ],
+                    [ 0, 0, 0,  1                   ],
+                  ]).toJSON()
 
-                  const demonstrationIndexMap = {}
-                  for (const [path, file] of fileList) {
-                    let index, key
-                    switch (file.name) {
-                      case demonstrationFiles.object_pose:
-                        [,,index] = path.match(poseRegex)
-                        key = 'object_pose'
-                        break
-                      case demonstrationFiles.joint_angle:
-                        [,,index] = path.match(jointRegex)
-                        key = 'joint_angle'
-                        break
-                      case demonstrationFiles.roi:
-                        [,,index] = path.match(roiRegex)
-                        key = 'roi'
-                    }
-                    index = index === undefined ? '' : `${parseInt(index)}`
-                    if ((index in demonstrationIndexMap) && (key in demonstrationIndexMap[index])) {
-                      alert(`Conflicting files${index !== '' ? ` for demonstration #${index}` : '' }:\n  ${path}\n  ${demonstrationIndexMap[index][key]}`)
-                      return
-                    }
-                    if (!(index in demonstrationIndexMap)) demonstrationIndexMap[index] = {}
-                    demonstrationIndexMap[index][key] = path
-                  }
+
+
+                  console.log(demonstration)
+                  console.log(objectPose)
+
+
 
                   const savedDemonstrations = JSON.parse(sessionStorage.getItem('demonstrations') ?? '{}')
-                  for (const index in demonstrationIndexMap) {
-                    for (const key of ['joint_angle', 'object_pose']) {
-                      if (!(key  in demonstrationIndexMap[index])) {
-                        alert(`${demonstrationFiles[key]} is not uploaded for demonstration #${index === '' ? '1' : index}`)
-                        return
-                      }
-                    }
-                    if (index in savedDemonstrations) {
-                      alert(`Demonstration #${index} is already uploaded`)
+
+                  let joint_limits = localStorage.getItem('joint_limits')
+                  joint_limits = nj.array(joint_limits.split('\n').map(row => row.split(',').map(cell => parseFloat(cell))))
+
+                  const demoIndices = Object.keys(savedDemonstrations)
+                  const index = demoIndices.length === 0 ? 1 : Math.max(...demoIndices) + 1
+                  savedDemonstrations[index] = {}
+                  
+                  savedDemonstrations[index]['joint_angle'] = demonstration
+                  savedDemonstrations[index]['object_pose'] = objectPose
+                  // sphere of radius equals to 1.5 times the minimum distance between object and guiding pose
+                  savedDemonstrations[index]['roi'] = 1.5
+                  savedDemonstrations[index].score = calculate_plan_score(
+                    joint_limits,
+                    nj.array(demonstration.split('\n').slice(1).map(row => row.split(',').map(cell => parseFloat(cell))))
+                  )
+
+                  sessionStorage.setItem('demonstrations', JSON.stringify(savedDemonstrations))
+
+                  const demonstrations = Object.entries(savedDemonstrations).map(([index, demo]) => ({
+                    id: parseInt(index),
+                    joint_angles: demo.joint_angle,
+                    object_poses: demo.object_pose,
+                    score: demo.score,
+                    region_of_interest: demo.roi
+                  }))
+
+                  const { initial_joint_config, n_objects, dimensions } = workSpaceConfig
+                  /*
+                    dimensions = [
+                      {'name': 'x',   'min': 0.6602,    'max': 1.2602,      'n_segments': 4},
+                      {'name': 'y',   'min': -0.185,    'max': 0.7560,      'n_segments': 4},
+                      {'name': 'θ',   'min':  0,        'max': 2 * Math.PI, 'n_segments': 1}
+                    ]
+                    
+                    ∀ p ∈ (x, y, θ) i.e. dimensions ∃ p' ∈ SE(3) s.t.
+                    
+                    p: (x, y, θ) implies p': | cos(θ)  -sin(θ)  0  x |  for any arbitrary z ∈ R
+                                             | sin(θ)   cos(θ)  0  y |
+                                             |      0        0  1  z |
+                                             |      0        0  0  1 |
+                    
+                    which rotates points in the xy plane counter-clockwise through an angle θ w.r.t. the positive x axis
+                  */
+
+                  const intervals = dimensions
+                                    .map(({ min, max, n_segments }) =>
+                                      linspace(min, max, n_segments + 1)
+                                      .reduce((acc, value, index, array) => {
+                                        if (index < array.length - 1)
+                                          acc.push([value, array[index + 1]])
+                                        else if (array.length === 1)
+                                          acc.push([value, value])
+                                        return acc
+                                      }, [])
+                                    )
+                  const segments = cartesianProduct(intervals, n_objects)
+                  const bandit_arms = Object.assign(...segments.map((segment, index) => ({ [index + 1]: { segment, demos: [] }})))
+                  // arm ∈ [1, (d1 * d2 * d3) ** n_objects]
+
+                  const renderPoints = []
+                  demonstrations.forEach((demo, index) => {
+                    const [x, y, z] = demo.object_poses.split('\n').map(line => line.trim()).filter(line => line.length).slice(0,3).map(row=> parseFloat(row.split(',').at(-1)))
+                    const arm = Object.values(bandit_arms).find(arm => {
+                      const [[x_min, x_max], [y_min, y_max], _] = arm.segment
+                      return (x_min <= x) && (x <= x_max) && (y_min <= y) && (y <= y_max)
+                    })
+                    if (arm === undefined) {
+                      alert(`Object pose used in demonstration #${index + 1} is outside the workspace`)
                       return
                     }
-                  }
+                    renderPoints.push([x, y, z, {
+                      id: demo.id,
+                      score: demo.score,
+                      joint_angles: demo.joint_angles.split('\n').map(line => line.trim()).filter(line => line.length).slice(1).map(row=> row.split(',').slice(0,8).map(num => parseFloat(num)))
+                    }])
+                    arm.demos.push(demo)
+                  })
 
-                  const worker = new Worker(new URL('file.worker.js', import.meta.url))
-                  worker.postMessage(Object.fromEntries(fileList))
-                  worker.onmessage = async ({ data: { result: fileData }}) => {
-                    worker.terminate()
+                  setDemonstrationsToRender(renderPoints)
+                  setProcessing(true)
 
-                    let joint_limits = localStorage.getItem('joint_limits')
-                    joint_limits = nj.array(joint_limits.split('\n').map(row => row.split(',').map(cell => parseFloat(cell))))
+                  /*
+                    This algorithm gives ε-optimal arm with probability 1 − δ
+                    Each arm must be sampled at least 1/2ε² * ln(2K/δ) times.
+                    Both ε and δ should be small numbers
+                  */
+                  naivePAC({
+                    dimensions,
+                    initial_joint_config,
+                    n_objects,
+                    demonstrations,
+                    arms: bandit_arms,
+                    onFinishCallback: ({ metadata, worst_arm_index, worst_arm_failure_probability, next_demonstration }) => {
+                      setDemonstrationAvailable(true)
+                      if (next_demonstration !== null)
+                        setNextDemonstrationToRender(next_demonstration)
 
-                    fileData = Object.fromEntries(fileData)
-                    for (const index in demonstrationIndexMap) {
-                      for (const key of ['joint_angle', 'object_pose', 'roi'])
-                        if (demonstrationIndexMap[index][key])
-                          demonstrationIndexMap[index][key] = fileData[demonstrationIndexMap[index][key]]
-
-                      // sphere of radius equals to 1.5 times the minimum distance between object and guiding pose
-                      demonstrationIndexMap[index].roi = 'roi' in demonstrationIndexMap[index] ? parseFloat(demonstrationIndexMap[index].roi) : 1.5
-                      demonstrationIndexMap[index].score = calculate_plan_score(
-                          joint_limits,
-                          nj.array(demonstrationIndexMap[index].joint_angle.split('\n').slice(1).map(row => row.split(',').map(cell => parseFloat(cell))))
+                      setTaskInstancesToRender(
+                        Object.values(metadata).map(({ task_instances, failed_indices, failure_scores, plans }) => {
+                          task_instances = task_instances.map(([[x, y, z]], index) => [x, y, z, { plans: plans[index], failed: false }])
+                          failed_indices.forEach((index, i) => {
+                            task_instances[index].at(-1).failed = true
+                            task_instances[index].at(-1).score = failure_scores[i]
+                          })
+                          return task_instances
+                        }).flat()
                       )
-                      if (index !== '')
-                        savedDemonstrations[index] = demonstrationIndexMap[index]
-                    }
-                    if ('' in demonstrationIndexMap) {
-                      const keys = Object.keys(savedDemonstrations).map(key => parseInt(key)).toSorted(),
-                            missingKey = keys.reduce((acc, value) => acc === value ? value + 1 : acc, 1)
-                      savedDemonstrations[missingKey] = demonstrationIndexMap['']
-                    }
 
-                    sessionStorage.setItem('demonstrations', JSON.stringify(savedDemonstrations))
-
-                    const demonstrations = Object.entries(savedDemonstrations)
-                      .map(([index, demo]) => ({
-                        id: parseInt(index),
-                        joint_angles: demo.joint_angle,
-                        object_poses: demo.object_pose,
-                        score: demo.score,
-                        region_of_interest: demo.roi
-                      }))
-
-                    const { initial_joint_config, n_objects, dimensions } = workSpaceConfig
-                    /*
-                      dimensions = [
-                        {'name': 'x',   'min': 0.6602,    'max': 1.2602,      'n_segments': 4},
-                        {'name': 'y',   'min': -0.185,    'max': 0.7560,      'n_segments': 4},
-                        {'name': 'θ',   'min':  0,        'max': 2 * Math.PI, 'n_segments': 1}
-                      ]
-                      
-                      ∀ p ∈ (x, y, θ) i.e. dimensions ∃ p' ∈ SE(3) s.t.
-                      
-                      p: (x, y, θ) implies p': | cos(θ)  -sin(θ)  0  x |  for any arbitrary z ∈ R
-                                               | sin(θ)   cos(θ)  0  y |
-                                               |      0        0  1  z |
-                                               |      0        0  0  1 |
-                      
-                      which rotates points in the xy plane counter-clockwise through an angle θ w.r.t. the positive x axis
-                    */
-
-                    const intervals = dimensions
-                                      .map(({ min, max, n_segments }) =>
-                                        linspace(min, max, n_segments + 1)
-                                        .reduce((acc, value, index, array) => {
-                                          if (index < array.length - 1)
-                                            acc.push([value, array[index + 1]])
-                                          else if (array.length === 1)
-                                            acc.push([value, value])
-                                          return acc
-                                        }, [])
-                                      )
-                    const segments = cartesianProduct(intervals, n_objects)
-                    const bandit_arms = Object.assign(...segments.map((segment, index) => ({ [index + 1]: { segment, demos: [] }})))
-                    // arm ∈ [1, (d1 * d2 * d3) ** n_objects]
-
-                    const renderPoints = []
-                    demonstrations.forEach((demo, index) => {
-                      const [x, y, z] = demo.object_poses.split('\n').map(line => line.trim()).filter(line => line.length).slice(0,3).map(row=> parseFloat(row.split(',').at(-1)))
-                      const arm = Object.values(bandit_arms).find(arm => {
-                        const [[x_min, x_max], [y_min, y_max], _] = arm.segment
-                        return (x_min <= x) && (x <= x_max) && (y_min <= y) && (y <= y_max)
-                      })
-                      if (arm === undefined) {
-                        alert(`Object pose used in demonstration #${index + 1} is outside the workspace`)
-                        return
-                      }
-                      renderPoints.push([x, y, z, {
-                        id: demo.id,
-                        score: demo.score,
-                        joint_angles: demo.joint_angles.split('\n').map(line => line.trim()).filter(line => line.length).slice(1).map(row=> row.split(',').slice(0,8).map(num => parseFloat(num)))
-                      }])
-                      arm.demos.push(demo)
-                    })
-
-                    setDemonstrationsToRender(renderPoints)
-                    setProcessing(true)
-
-
-                    /*
-                      This algorithm gives ε-optimal arm with probability 1 − δ
-                      Each arm must be sampled at least 1/2ε² * ln(2K/δ) times.
-                      Both ε and δ should be small numbers
-                    */
-                    naivePAC({
-                      dimensions,
-                      initial_joint_config,
-                      n_objects,
-                      demonstrations,
-                      arms: bandit_arms,
-                      onFinishCallback: ({ metadata, worst_arm_index, worst_arm_failure_probability, next_demonstration }) => {
-                        setDemonstrationAvailable(true)
-                        if (next_demonstration !== null)
-                          setNextDemonstrationToRender(next_demonstration)
-
-                        setTaskInstancesToRender(
-                          Object.values(metadata).map(({ task_instances, failed_indices, failure_scores, plans }) => {
-                            task_instances = task_instances.map(([[x, y, z]], index) => [x, y, z, { plans: plans[index], failed: false }])
-                            failed_indices.forEach((index, i) => {
-                              task_instances[index].at(-1).failed = true
-                              task_instances[index].at(-1).score = failure_scores[i]
-                            })
-                            return task_instances
-                          }).flat()
+                      setProbabilityHeatMap(
+                        Object.fromEntries(
+                          Object.entries(metadata)
+                          .map(([arm_id, { task_instances, failed_indices }]) => [arm_id, failed_indices.length / task_instances.length ])
                         )
+                      )
 
-                        setProbabilityHeatMap(
-                          Object.fromEntries(
-                            Object.entries(metadata)
-                            .map(([arm_id, { task_instances, failed_indices }]) => [arm_id, failed_indices.length / task_instances.length ])
-                          )
-                        )
-
-                        setProcessing(false)
-                      }
-                    })
-                  }
+                      setProcessing(false)
+                    }
+                  })
+                })
+                .catch(error => alert(error))
+                .finally(() => callBack())
+              )
+            }
+          }}/>
+          <>
+            {!demonstrationAvailable ? <h3>Robot's Workspace</h3> : <h3>Robot's Belief</h3>}
+            <div style={{ display: 'flex', flexDirection: 'column', margin: '0 auto', justifyContent: 'center', alignItems: 'center', position: 'relative' }}>
+              <img
+                src={robotImageUrl}
+                onLoad={({ target }) => setRobotImageDimensions({ width: target.width, height: target.height })}
+                style={{
+                  position: 'absolute', zIndex: -1, opacity: 0.2,
+                  width: robotImageWidth,
+                  bottom: - robotImageDimensions.height / 2,
+                  right: - robotImageDimensions.width / 2 - workSpaceConfig.y.min * workSpaceTheme.scale
                 }}
-              >
-                <img
-                  src={robotImageUrl}
-                  onLoad={({ target }) => setRobotImageDimensions({ width: target.width, height: target.height })}
+              />
+              {
+                Array(workSpaceConfig.x.n_segments).fill().map((_, row) => {
+                  const cellWidth = (workSpaceConfig.y.max - workSpaceConfig.y.min) * workSpaceTheme.scale / workSpaceConfig.y.n_segments,
+                        cellHeight = (workSpaceConfig.x.max - workSpaceConfig.x.min) * workSpaceTheme.scale / workSpaceConfig.x.n_segments
+                  return (
+                    <div key={row} style={{ width: cellWidth * workSpaceConfig.y.n_segments, height: cellHeight, display: 'flex', flexDirection: 'row' }}>
+                      {
+                        Array(workSpaceConfig.y.n_segments).fill().map((_, column) => {
+                          const probability = probabilityHeatMap[workSpaceConfig.x.n_segments * workSpaceConfig.y.n_segments - row * workSpaceConfig.x.n_segments - column]
+                          return  (
+                            <div
+                              ref={row === 0 && column === 0 ? firstCellRef : null}
+                              key={column}
+                              title={probability !== undefined ? `Failure probability: ${probability}` : ''}
+                              style={Object.assign(
+                                {
+                                  width: cellWidth,
+                                  height: cellHeight,
+                                  borderRight: `${workSpaceTheme.border.width}px solid ${workSpaceTheme.border.color}`,
+                                  borderBottom: `${workSpaceTheme.border.width}px solid ${workSpaceTheme.border.color}`,
+                                  backgroundColor: `rgba(${workSpaceTheme.heatmapColor.red}, ${workSpaceTheme.heatmapColor.green}, ${workSpaceTheme.heatmapColor.blue}, ${probability ?? 0})`
+                                },
+                                row === 0 ? { borderTop: `${workSpaceTheme.border.width}px solid ${workSpaceTheme.border.color}` } : {},
+                                column === 0 ? { borderLeft: `${workSpaceTheme.border.width}px solid ${workSpaceTheme.border.color}` } : {}
+                              )}
+                              onClick={event => {
+                                if (freezeUserClickPose) return
+                                const offsets = firstCellRef.current.getBoundingClientRect(),
+                                      x = event.pageX - offsets.left,
+                                      y = event.pageY - offsets.top
+                                if (x >=0 && y >= 0 && x <= workSpaceConfig.x.n_segments * cellWidth && y <= workSpaceConfig.y.n_segments * cellHeight) {
+                                  const xx = workSpaceConfig.x.min + (workSpaceConfig.y.n_segments * cellHeight - y) * (workSpaceConfig.x.max - workSpaceConfig.x.min) / (workSpaceConfig.y.n_segments * cellHeight)
+                                  const yy = workSpaceConfig.y.min + (workSpaceConfig.x.n_segments * cellWidth - x) * (workSpaceConfig.y.max - workSpaceConfig.y.min) / (workSpaceConfig.x.n_segments * cellWidth)
+                                  setUserClickPose({ x, y, xx, yy })
+                                }
+                              }}
+                            />                            
+                          )
+                        }) 
+                      }
+                    </div>
+                  )
+                })
+              }
+              {
+                taskInstancesToRender.map(([x, y, z, { plans, failed, score }], index) => 
+                  <PlanInfo
+                    key={index}
+                    style={{
+                      position: 'absolute',
+                      opacity: 0.8,
+                      cursor: 'pointer',
+                      backgroundColor: failed ? workSpaceTheme.taskInstance.failure : workSpaceTheme.taskInstance.success,
+                      width: workSpaceTheme.taskInstance.size,
+                      height: workSpaceTheme.taskInstance.size,
+                      borderRadius: workSpaceTheme.taskInstance.size / 2,
+                      top: (workSpaceConfig.x.max - x) * workSpaceTheme.scale - workSpaceTheme.taskInstance.size / 2,
+                      left: (workSpaceConfig.y.max - y) * workSpaceTheme.scale - workSpaceTheme.taskInstance.size / 2
+                    }}
+                    position={[x, y, z]}
+                    plans={plans}
+                  />
+                )
+              }
+              {
+                demonstrationsToRender.map(([x, y, z, { id, score, joint_angles }], index) => 
+                  <span
+                    key={index}
+                    title={`Score: ${score}`}
+                    style={{
+                      position: 'absolute',
+                      cursor: 'pointer',
+                      textAlign: 'center',
+                      opacity: 0.8,
+                      color: workSpaceTheme.demonstration.textColor,
+                      fontSize: workSpaceTheme.demonstration.size,
+                      lineHeight: `${workSpaceTheme.demonstration.size}px`,
+                      width: workSpaceTheme.demonstration.size, height: workSpaceTheme.demonstration.size,
+                      borderRadius: workSpaceTheme.demonstration.size / 2,
+                      backgroundColor: workSpaceTheme.demonstration.color,
+                      top: (workSpaceConfig.x.max - x) * workSpaceTheme.scale - workSpaceTheme.demonstration.size / 2,
+                      left: (workSpaceConfig.y.max - y) * workSpaceTheme.scale - workSpaceTheme.demonstration.size / 2
+                    }}
+                    onClick={() => {
+                      joint_angles = nj.array(joint_angles)
+                      const state = { plan: joint_angles.slice(null, [1,8]).tolist(), timestamps: joint_angles.slice(null, [0,1]).tolist().flat(), position: [x, y, z] }                        
+                      localStorage.setItem('navigation_state', JSON.stringify(state))
+                      window.open('/visualise.html', '_blank', 'noreferrer')
+                    }}
+                  >
+                    {id}
+                  </span>
+                )
+              }
+              {
+                nextDemonstrationToRender.map(([x, y], index) => 
+                  <span
+                    key={index}
+                    style={{
+                      position: 'absolute',
+                      backgroundColor: 'transparent',
+                      opacity: 0.8,
+                      zIndex: -1,
+                      width: workSpaceTheme.nextDemonstration.size,
+                      height: workSpaceTheme.nextDemonstration.size,
+                      borderRadius: (workSpaceTheme.nextDemonstration.size + 2 * workSpaceTheme.nextDemonstration.border) / 2,
+                      border: `${workSpaceTheme.nextDemonstration.border}px solid ${workSpaceTheme.nextDemonstration.color}`,
+                      top: (workSpaceConfig.x.max - x) * workSpaceTheme.scale - (workSpaceTheme.nextDemonstration.size + 2 * workSpaceTheme.nextDemonstration.border) / 2,
+                      left: (workSpaceConfig.y.max - y) * workSpaceTheme.scale - (workSpaceTheme.nextDemonstration.size + 2 * workSpaceTheme.nextDemonstration.border) / 2
+                    }}
+                  />
+                )
+              }
+              { showObjectPoseHint && userClickPose !== null && (
+                <span
                   style={{
-                    position: 'absolute', zIndex: -1, opacity: 0.2,
-                    width: robotImageWidth,
-                    bottom: - robotImageDimensions.height / 2,
-                    right: - robotImageDimensions.width / 2 - workSpaceConfig.y.min * workSpaceTheme.scale
+                    position: 'absolute',
+                    opacity: 0.4,
+                    width: workSpaceTheme.demonstration.size * 2, height: workSpaceTheme.demonstration.size * 2,
+                    borderRadius: workSpaceTheme.demonstration.size,
+                    backgroundColor: 'black',
+                    top: userClickPose.y - workSpaceTheme.demonstration.size,
+                    left: userClickPose.x - workSpaceTheme.demonstration.size
                   }}
                 />
-                {
-                  Array(workSpaceConfig.x.n_segments).fill().map((_, row) => {
-                    const cellWidth = (workSpaceConfig.y.max - workSpaceConfig.y.min) * workSpaceTheme.scale / workSpaceConfig.y.n_segments,
-                          cellHeight = (workSpaceConfig.x.max - workSpaceConfig.x.min) * workSpaceTheme.scale / workSpaceConfig.x.n_segments
-                    return (
-                      <div key={row} style={{ width: cellWidth * workSpaceConfig.y.n_segments, height: cellHeight, display: 'flex', flexDirection: 'row' }}>
-                        {
-                          Array(workSpaceConfig.y.n_segments).fill().map((_, column) => {
-                            const probability = probabilityHeatMap[workSpaceConfig.x.n_segments * workSpaceConfig.y.n_segments - row * workSpaceConfig.x.n_segments - column]
-                            return  (
-                              <div
-                                key={column}
-                                title={probability !== undefined ? `Failure probability: ${probability}` : ''}
-                                style={Object.assign(
-                                  {
-                                    width: cellWidth,
-                                    height: cellHeight,
-                                    borderRight: `${workSpaceTheme.border.width}px solid ${workSpaceTheme.border.color}`,
-                                    borderBottom: `${workSpaceTheme.border.width}px solid ${workSpaceTheme.border.color}`,
-                                    backgroundColor: `rgba(${workSpaceTheme.heatmapColor.red}, ${workSpaceTheme.heatmapColor.green}, ${workSpaceTheme.heatmapColor.blue}, ${probability ?? 0})`
-                                  },
-                                  row === 0 ? { borderTop: `${workSpaceTheme.border.width}px solid ${workSpaceTheme.border.color}` } : {},
-                                  column === 0 ? { borderLeft: `${workSpaceTheme.border.width}px solid ${workSpaceTheme.border.color}` } : {}
-                                )}
-                              />                            
-                            )
-                          }) 
-                        }
-                      </div>
-                    )
-                  })
-                }
-                {
-                  taskInstancesToRender.map(([x, y, z, { plans, failed, score }], index) => 
-                    <PlanInfo
-                      key={index}
-                      style={{
-                        position: 'absolute',
-                        opacity: 0.8,
-                        cursor: 'pointer',
-                        backgroundColor: failed ? workSpaceTheme.taskInstance.failure : workSpaceTheme.taskInstance.success,
-                        width: workSpaceTheme.taskInstance.size,
-                        height: workSpaceTheme.taskInstance.size,
-                        borderRadius: workSpaceTheme.taskInstance.size / 2,
-                        top: (workSpaceConfig.x.max - x) * workSpaceTheme.scale - workSpaceTheme.taskInstance.size / 2,
-                        left: (workSpaceConfig.y.max - y) * workSpaceTheme.scale - workSpaceTheme.taskInstance.size / 2
-                      }}
-                      position={[x, y, z]}
-                      plans={plans}
-                    />
-                  )
-                }
-                {
-                  demonstrationsToRender.map(([x, y, z, { id, score, joint_angles }], index) => 
-                    <span
-                      key={index}
-                      title={`Score: ${score}`}
-                      style={{
-                        position: 'absolute',
-                        cursor: 'pointer',
-                        textAlign: 'center',
-                        opacity: 0.8,
-                        color: workSpaceTheme.demonstration.textColor,
-                        fontSize: workSpaceTheme.demonstration.size,
-                        lineHeight: `${workSpaceTheme.demonstration.size}px`,
-                        width: workSpaceTheme.demonstration.size, height: workSpaceTheme.demonstration.size,
-                        borderRadius: workSpaceTheme.demonstration.size / 2,
-                        backgroundColor: workSpaceTheme.demonstration.color,
-                        top: (workSpaceConfig.x.max - x) * workSpaceTheme.scale - workSpaceTheme.demonstration.size / 2,
-                        left: (workSpaceConfig.y.max - y) * workSpaceTheme.scale - workSpaceTheme.demonstration.size / 2
-                      }}
-                      onClick={() => {
-                        joint_angles = nj.array(joint_angles)
-                        const state = { plan: joint_angles.slice(null, [1,8]).tolist(), timestamps: joint_angles.slice(null, [0,1]).tolist().flat(), position: [x, y, z] }                        
-                        localStorage.setItem('navigation_state', JSON.stringify(state))
-                        window.open('/visualise.html', '_blank', 'noreferrer')
-                      }}
-                    >
-                      {id}
-                    </span>
-                  )
-                }
-                {
-                  nextDemonstrationToRender.map(([x, y], index) => 
-                    <span
-                      key={index}
-                      style={{
-                        position: 'absolute',
-                        backgroundColor: 'transparent',
-                        opacity: 0.8,
-                        zIndex: -1,
-                        width: workSpaceTheme.nextDemonstration.size,
-                        height: workSpaceTheme.nextDemonstration.size,
-                        borderRadius: (workSpaceTheme.nextDemonstration.size + 2 * workSpaceTheme.nextDemonstration.border) / 2,
-                        border: `${workSpaceTheme.nextDemonstration.border}px solid ${workSpaceTheme.nextDemonstration.color}`,
-                        top: (workSpaceConfig.x.max - x) * workSpaceTheme.scale - (workSpaceTheme.nextDemonstration.size + 2 * workSpaceTheme.nextDemonstration.border) / 2,
-                        left: (workSpaceConfig.y.max - y) * workSpaceTheme.scale - (workSpaceTheme.nextDemonstration.size + 2 * workSpaceTheme.nextDemonstration.border) / 2
-                      }}
-                    />
-                  )
-                }
-              </DropZoneWrapper>
-            </>
-          }
+              )}
+            </div>
+          </>
           <>
             <div style={{ display: 'flex', flexDirection: 'row', position: 'absolute', top: 20, left: 20 }}>
               {demoConfigAvailable &&  (
@@ -623,23 +685,7 @@ export default function App() {
                   </div>
                 </>
               )}
-              {demoConfigAvailable &&  (
-                <div style={{ position: 'relative' }}>
-                  <span className='material-symbols-rounded' title='Reset the demonstration configuration' style={{ cursor: 'pointer', fontSize: 40 }} onClick={() => {
-                    sessionStorage.clear()
-                    setDemoConfigAvailable(false)
-                    setDemonstrationAvailable(false)
-                    setProbabilityHeatMap({})
-                    setTaskInstancesToRender([])
-                    setDemonstrationsToRender([])
-                    setNextDemonstrationToRender([])
-                  }}>
-                    delete
-                    <span className='material-symbols-rounded' style={{ position: 'absolute', bottom: 0, right: 0 }}>grid_on</span>
-                  </span>
-                </div>
-              )}
-              {robotConfigAvailable && (
+              {demoConfigAvailable && robotConfigAvailable && (
                 <div style={{ position: 'relative' }}>
                   <span className='material-symbols-rounded' title='Reset the robot configuration' style={{ cursor: 'pointer', fontSize: 40 }} onClick={() => {
                     localStorage.clear()
