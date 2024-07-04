@@ -7,7 +7,7 @@ import Visualise from './Visualise'
 
 const router = createBrowserRouter([
   { path: '/', element: <App /> },
-  { path: '/visualise.html', element: <Visualise /> }
+  { path: '/visualise', element: <Visualise /> }
 ])
 
 createRoot(document.getElementById('root')).render(

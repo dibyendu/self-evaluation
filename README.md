@@ -13,7 +13,24 @@
 `npm start`
 
 
+
+
 ## Run in client-server mode
+
+`cd web_assembly`
+
+### Build the files
+`npm i`
+`cd backend && pip install -r requirements.txt && cd ..`
+`npm run build`
+
+### Start server
+`python backend/app.py`
+
+
+
+
+## Run in command-line (CLI) mode
 
 ### Compile server code
 

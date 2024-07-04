@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState, useRef } from 'react'
 import nj from 'https://esm.run/numjs'
 
-
 import './css/style.css'
 import {
   backEndHost,
@@ -12,7 +11,6 @@ import {
 } from './Config'
 import naivePAC from './Bandit'
 import robotImageUrl from './img/robot_top_view.svg'
-import DropZone, { DropZoneWrapper } from './DropZone'
 
 
 
@@ -33,7 +31,6 @@ const defaultWorkSpaceTheme = {
 }
 
 const robotImageWidth = 400
-
 
 
 function calculate_plan_score(joint_limits, joint_angles) {
@@ -136,7 +133,7 @@ function PlanInfo({ style, position, plans }) {
                     <span className='material-symbols-rounded' style={{ cursor: 'pointer', verticalAlign: 'text-bottom' }} onClick={() => {
                       const state = { plan, position, screw_segments }
                       localStorage.setItem('navigation_state', JSON.stringify(state))
-                      window.open('/visualise.html', '_blank', 'noreferrer')
+                      window.open('/visualise', '_blank', 'noreferrer')
                     }}>
                       visibility
                     </span>
@@ -275,7 +272,7 @@ export default function App() {
       <Theme open={themeOpen} setOpen={setThemeOpen} applyTheme={theme => setWorkSpaceTheme(prev => ({ ...prev, ...theme }))}/>
       {processing && <div style={{ width: '100%', height: '100%', backgroundColor: '#00000088', position: 'absolute', top: 0, left: 0, zIndex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center' }}><div className='spinner' /></div>}
       {
-        !robotConfigAvailable
+        !robotConfigAvailable || !demoConfigAvailable
         ?
         <button className={`button ${isPending ? 'disabled' : ''}`} onClick={() => {
           if (isPending) return
@@ -333,20 +330,12 @@ export default function App() {
                   setShowObjectPoseHint(true)
                   setFreezeUserClickPose(false)
 
-
                   const objectPose = nj.array([
                     [ 1, 0, 0,  userClickPose.xx    ],
                     [ 0, 1, 0,  userClickPose.yy    ],
                     [ 0, 0, 1, -0.06447185171756116 ],
                     [ 0, 0, 0,  1                   ],
-                  ]).toJSON()
-
-
-
-                  console.log(demonstration)
-                  console.log(objectPose)
-
-
+                  ]).tolist().map(row => row.join(',')).join('\r\n')
 
                   const savedDemonstrations = JSON.parse(sessionStorage.getItem('demonstrations') ?? '{}')
 
@@ -574,7 +563,7 @@ export default function App() {
                       joint_angles = nj.array(joint_angles)
                       const state = { plan: joint_angles.slice(null, [1,8]).tolist(), timestamps: joint_angles.slice(null, [0,1]).tolist().flat(), position: [x, y, z] }                        
                       localStorage.setItem('navigation_state', JSON.stringify(state))
-                      window.open('/visualise.html', '_blank', 'noreferrer')
+                      window.open('/visualise', '_blank', 'noreferrer')
                     }}
                   >
                     {id}
