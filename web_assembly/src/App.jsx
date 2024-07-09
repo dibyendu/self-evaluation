@@ -539,7 +539,7 @@ export default function App() {
                         position: 'absolute',
                         backgroundColor: 'transparent',
                         opacity: 0.8,
-                        zIndex: -1,
+                        zIndex: 1,
                         width: workSpaceTheme.nextDemonstration.size,
                         height: workSpaceTheme.nextDemonstration.size,
                         borderRadius: (workSpaceTheme.nextDemonstration.size + 2 * workSpaceTheme.nextDemonstration.border) / 2,
