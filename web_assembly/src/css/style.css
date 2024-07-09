@@ -90,8 +90,7 @@
 .switch input:checked + .slider .ball {
   left: 88%;
   transform: rotate(360deg);
-  box-shadow: none;
-  outline: 6px solid rgba(255, 255, 255, 0.278);
+  box-shadow: none
 }
 
 .switch .slider {

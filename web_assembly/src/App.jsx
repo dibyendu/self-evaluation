@@ -16,7 +16,7 @@ import robotImageUrl from './img/robot_top_view.svg'
 
 
 const robotConfiguration = import.meta.glob('../../baxter_config/*.csv', { query: '?raw' })
-import demonstrationConfiguration from '../../demonstrations/Scoop_Interactive/config.json'
+import demonstrationConfiguration from '../../demonstrations/Pour/config.json'
 
 
 
@@ -176,21 +176,8 @@ function Switch({ disabled, handleToggle }) {
           <span className='title'>{active ? 'Stop Taking Demonstration' : 'Start Taking Demonstration'}</span>
           <span className='ball'>
             <span className='icon'>
-              <svg
-                aria-hidden='true'
-                xmlns='http://www.w3.org/2000/svg'
-                width={25}
-                height={25}
-                fill='none'
-                viewBox='0 0 24 24'
-              >
-                <path
-                  stroke='currentColor'
-                  strokeLinecap='round'
-                  strokeLinejoin='round'
-                  strokeWidth={2}
-                  d='M8 18V6l8 6-8 6Z'
-                ></path>
+              <svg width={25} height={25} viewBox='0 0 24 24' fill='none' aria-hidden='true' xmlns='http://www.w3.org/2000/svg'>
+                <path d={active ? 'M 8 18 V 6 l 2 0 l 0 12 Z M 14 18 V 6 l 2 0 l 0 12 Z' : 'M8 18V6l8 6-8 6Z'} strokeWidth={2} stroke='currentColor' strokeLinecap='round' strokeLinejoin='round'/>
               </svg>
             </span>
           </span>

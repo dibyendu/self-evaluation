@@ -24,4 +24,4 @@ export const demonstrationFiles = {
 }
 
 
-export const backEndHost = 'http://127.0.0.1:8000'
+export const backEndHost = 'http://192.168.1.107:8000'
