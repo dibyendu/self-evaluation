@@ -5,7 +5,7 @@
 
 `cd ~/self-evaluation/web_assembly`
 
-### Build the files (one time action)
+### Install dependencies and build the files (one time action)
 `npm i`
 `pip install -r backend/requirements.txt`
 `npm run build`

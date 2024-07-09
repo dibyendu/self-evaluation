@@ -16,7 +16,7 @@ import robotImageUrl from './img/robot_top_view.svg'
 
 
 const robotConfiguration = import.meta.glob('../../baxter_config/*.csv', { query: '?raw' })
-import demonstrationConfiguration from '../../demonstrations/Pour/config.json'
+import demonstrationConfiguration from '../../demonstration_config.json'
 
 
 
@@ -565,7 +565,7 @@ export default function App() {
                       position: 'absolute',
                       backgroundColor: 'transparent',
                       opacity: 0.8,
-                      zIndex: -1,
+                      zIndex: 1,
                       width: workSpaceTheme.nextDemonstration.size,
                       height: workSpaceTheme.nextDemonstration.size,
                       borderRadius: (workSpaceTheme.nextDemonstration.size + 2 * workSpaceTheme.nextDemonstration.border) / 2,
