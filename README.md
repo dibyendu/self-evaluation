@@ -1,4 +1,4 @@
-## Run on the robot's server
+## Run on the Robot's server
 
 ### Activate virtualenv
 `source ~/miniconda3/bin/activate py37`
