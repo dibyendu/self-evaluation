@@ -12,7 +12,7 @@
 
 `npm run build`
 
-### Start server
+### Start the server
 `python backend/app.py`
 
 ### Deactivate virtualenv
