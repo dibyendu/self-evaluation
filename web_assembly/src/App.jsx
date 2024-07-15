@@ -201,6 +201,7 @@ export default function App() {
   const [robotImageDimensions, setRobotImageDimensions] = useState({ width: 0, height: 0 })
 
   const [processing, setProcessing] = useState(false)
+  const [waitTime, setWaitTime] = useState(10)
   const [isPending, startAction] = useAsyncAction()
 
   const [probabilityHeatMap, setProbabilityHeatMap] = useState({})
@@ -264,7 +265,8 @@ export default function App() {
         <button className={`button ${isPending ? 'disabled' : ''}`} onClick={() => {
           if (isPending) return
           startAction(() =>
-            fetch(`${backEndHost}/init`).then(response => {
+            fetch(`${backEndHost}/init`)
+            .then(response => {
               if (response.ok) {
                 loadConfiguration(Object.entries(robotConfiguration))
                 sessionStorage.setItem(demonstrationConfigurationFile, JSON.stringify(demonstrationConfiguration))
@@ -287,169 +289,177 @@ export default function App() {
         </button>
         :
         <>
-          <Switch disabled={isPending} handleToggle={(isActive, callBack) => {
-            if (isPending) return
-            if (!isActive) {
-              if (userClickPose === null) {
-                alert('Please click inside the workspace to set the object position before collecting the demonstration')
-                return
-              }
-              setFreezeUserClickPose(true)
-              startAction(() =>
-                fetch(`${backEndHost}/start`)
-                .then(response => {
-                  if (response.ok)
-                    return response.json()
+          <div style={{ display: 'flex', flexDirection: 'row', justifyContent: 'center', alignItems: 'center', position: 'absolute', top: 20 }}>
+            <Switch disabled={isPending} handleToggle={(isActive, callBack) => {
+              if (isPending) return
+              if (!isActive) {
+                if (userClickPose === null) {
+                  alert('Please click inside the workspace to set the object position before collecting the demonstration')
+                  return
+                }
+                setFreezeUserClickPose(true)
+                startAction(() => {
+                  const { initial_joint_config } = JSON.parse(sessionStorage.getItem(demonstrationConfigurationFile))
+                  return fetch(`${backEndHost}/start`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ joint_config: initial_joint_config, wait_time: waitTime })
+                  })
+                  .then(response => {
+                    if (response.ok)
+                      return response.json()
+                  })
+                  .then(({ pid }) => setDemonstrationProcessPID(pid))
+                  .catch(error => alert(error))
+                  .finally(() => callBack())
                 })
-                .then(({ pid }) => setDemonstrationProcessPID(pid))
-                .catch(error => alert(error))
-                .finally(() => callBack())
-              )
-            } else {
-              startAction(() =>
-                fetch(`${backEndHost}/stop/${demonstrationProcessPID}`)
-                .then(response => {
-                  if (response.ok)
-                    return response.json()
-                })
-                .then(({ demonstration }) => {
-                  setUserClickPose(null)
-                  setShowObjectPoseHint(true)
-                  setFreezeUserClickPose(false)
+              } else {
+                startAction(() =>
+                  fetch(`${backEndHost}/stop/${demonstrationProcessPID}`)
+                  .then(response => {
+                    if (response.ok)
+                      return response.json()
+                  })
+                  .then(({ demonstration }) => {
+                    setUserClickPose(null)
+                    setShowObjectPoseHint(true)
+                    setFreezeUserClickPose(false)
 
-                  const objectPose = nj.array([
-                    [ 1, 0, 0,  userClickPose.xx    ],
-                    [ 0, 1, 0,  userClickPose.yy    ],
-                    [ 0, 0, 1, -0.06447185171756116 ],
-                    [ 0, 0, 0,  1                   ],
-                  ]).tolist().map(row => row.join(',')).join('\r\n')
+                    const objectPose = nj.array([
+                      [ 1, 0, 0,  userClickPose.xx    ],
+                      [ 0, 1, 0,  userClickPose.yy    ],
+                      [ 0, 0, 1, -0.06447185171756116 ],
+                      [ 0, 0, 0,  1                   ],
+                    ]).tolist().map(row => row.join(',')).join('\r\n')
 
-                  const savedDemonstrations = JSON.parse(sessionStorage.getItem('demonstrations') ?? '{}')
+                    const savedDemonstrations = JSON.parse(sessionStorage.getItem('demonstrations') ?? '{}')
 
-                  let joint_limits = localStorage.getItem('joint_limits')
-                  joint_limits = nj.array(joint_limits.split('\n').map(row => row.split(',').map(cell => parseFloat(cell))))
+                    let joint_limits = localStorage.getItem('joint_limits')
+                    joint_limits = nj.array(joint_limits.split('\n').map(row => row.split(',').map(cell => parseFloat(cell))))
 
-                  const demoIndices = Object.keys(savedDemonstrations)
-                  const index = demoIndices.length === 0 ? 1 : Math.max(...demoIndices) + 1
-                  savedDemonstrations[index] = {}
-                  
-                  savedDemonstrations[index]['joint_angle'] = demonstration
-                  savedDemonstrations[index]['object_pose'] = objectPose
-                  // sphere of radius equals to 1.5 times the minimum distance between object and guiding pose
-                  savedDemonstrations[index]['roi'] = 1.5
-                  savedDemonstrations[index].score = calculate_plan_score(
-                    joint_limits,
-                    nj.array(demonstration.split('\n').slice(1).map(row => row.split(',').map(cell => parseFloat(cell))))
-                  )
-
-                  sessionStorage.setItem('demonstrations', JSON.stringify(savedDemonstrations))
-
-                  const demonstrations = Object.entries(savedDemonstrations).map(([index, demo]) => ({
-                    id: parseInt(index),
-                    joint_angles: demo.joint_angle,
-                    object_poses: demo.object_pose,
-                    score: demo.score,
-                    region_of_interest: demo.roi
-                  }))
-
-                  const { initial_joint_config, n_objects, dimensions } = workSpaceConfig
-                  /*
-                    dimensions = [
-                      {'name': 'x',   'min': 0.6602,    'max': 1.2602,      'n_segments': 4},
-                      {'name': 'y',   'min': -0.185,    'max': 0.7560,      'n_segments': 4},
-                      {'name': 'θ',   'min':  0,        'max': 2 * Math.PI, 'n_segments': 1}
-                    ]
+                    const demoIndices = Object.keys(savedDemonstrations)
+                    const index = demoIndices.length === 0 ? 1 : Math.max(...demoIndices) + 1
+                    savedDemonstrations[index] = {}
                     
-                    ∀ p ∈ (x, y, θ) i.e. dimensions ∃ p' ∈ SE(3) s.t.
-                    
-                    p: (x, y, θ) implies p': | cos(θ)  -sin(θ)  0  x |  for any arbitrary z ∈ R
-                                             | sin(θ)   cos(θ)  0  y |
-                                             |      0        0  1  z |
-                                             |      0        0  0  1 |
-                    
-                    which rotates points in the xy plane counter-clockwise through an angle θ w.r.t. the positive x axis
-                  */
+                    savedDemonstrations[index]['joint_angle'] = demonstration
+                    savedDemonstrations[index]['object_pose'] = objectPose
+                    // sphere of radius equals to 1.5 times the minimum distance between object and guiding pose
+                    savedDemonstrations[index]['roi'] = 1.5
+                    savedDemonstrations[index].score = calculate_plan_score(
+                      joint_limits,
+                      nj.array(demonstration.split('\n').slice(1).map(row => row.split(',').map(cell => parseFloat(cell))))
+                    )
 
-                  const intervals = dimensions
-                                    .map(({ min, max, n_segments }) =>
-                                      linspace(min, max, n_segments + 1)
-                                      .reduce((acc, value, index, array) => {
-                                        if (index < array.length - 1)
-                                          acc.push([value, array[index + 1]])
-                                        else if (array.length === 1)
-                                          acc.push([value, value])
-                                        return acc
-                                      }, [])
-                                    )
-                  const segments = cartesianProduct(intervals, n_objects)
-                  const bandit_arms = Object.assign(...segments.map((segment, index) => ({ [index + 1]: { segment, demos: [] }})))
-                  // arm ∈ [1, (d1 * d2 * d3) ** n_objects]
+                    sessionStorage.setItem('demonstrations', JSON.stringify(savedDemonstrations))
 
-                  const renderPoints = []
-                  demonstrations.forEach((demo, index) => {
-                    const [x, y, z] = demo.object_poses.split('\n').map(line => line.trim()).filter(line => line.length).slice(0,3).map(row=> parseFloat(row.split(',').at(-1)))
-                    const arm = Object.values(bandit_arms).find(arm => {
-                      const [[x_min, x_max], [y_min, y_max], _] = arm.segment
-                      return (x_min <= x) && (x <= x_max) && (y_min <= y) && (y <= y_max)
-                    })
-                    if (arm === undefined) {
-                      alert(`Object pose used in demonstration #${index + 1} is outside the workspace`)
-                      return
-                    }
-                    renderPoints.push([x, y, z, {
-                      id: demo.id,
+                    const demonstrations = Object.entries(savedDemonstrations).map(([index, demo]) => ({
+                      id: parseInt(index),
+                      joint_angles: demo.joint_angle,
+                      object_poses: demo.object_pose,
                       score: demo.score,
-                      joint_angles: demo.joint_angles.split('\n').map(line => line.trim()).filter(line => line.length).slice(1).map(row=> row.split(',').slice(0,8).map(num => parseFloat(num)))
-                    }])
-                    arm.demos.push(demo)
-                  })
+                      region_of_interest: demo.roi
+                    }))
 
-                  setDemonstrationsToRender(renderPoints)
-                  setProcessing(true)
+                    const { initial_joint_config, n_objects, dimensions } = workSpaceConfig
+                    /*
+                      dimensions = [
+                        {'name': 'x',   'min': 0.6602,    'max': 1.2602,      'n_segments': 4},
+                        {'name': 'y',   'min': -0.185,    'max': 0.7560,      'n_segments': 4},
+                        {'name': 'θ',   'min':  0,        'max': 2 * Math.PI, 'n_segments': 1}
+                      ]
+                      
+                      ∀ p ∈ (x, y, θ) i.e. dimensions ∃ p' ∈ SE(3) s.t.
+                      
+                      p: (x, y, θ) implies p': | cos(θ)  -sin(θ)  0  x |  for any arbitrary z ∈ R
+                                               | sin(θ)   cos(θ)  0  y |
+                                               |      0        0  1  z |
+                                               |      0        0  0  1 |
+                      
+                      which rotates points in the xy plane counter-clockwise through an angle θ w.r.t. the positive x axis
+                    */
 
-                  /*
-                    This algorithm gives ε-optimal arm with probability 1 − δ
-                    Each arm must be sampled at least 1/2ε² * ln(2K/δ) times.
-                    Both ε and δ should be small numbers
-                  */
-                  naivePAC({
-                    dimensions,
-                    initial_joint_config,
-                    n_objects,
-                    demonstrations,
-                    arms: bandit_arms,
-                    onFinishCallback: ({ metadata, worst_arm_index, worst_arm_failure_probability, next_demonstration }) => {
-                      setDemonstrationAvailable(true)
-                      if (next_demonstration !== null)
-                        setNextDemonstrationToRender(next_demonstration)
+                    const intervals = dimensions
+                                      .map(({ min, max, n_segments }) =>
+                                        linspace(min, max, n_segments + 1)
+                                        .reduce((acc, value, index, array) => {
+                                          if (index < array.length - 1)
+                                            acc.push([value, array[index + 1]])
+                                          else if (array.length === 1)
+                                            acc.push([value, value])
+                                          return acc
+                                        }, [])
+                                      )
+                    const segments = cartesianProduct(intervals, n_objects)
+                    const bandit_arms = Object.assign(...segments.map((segment, index) => ({ [index + 1]: { segment, demos: [] }})))
+                    // arm ∈ [1, (d1 * d2 * d3) ** n_objects]
 
-                      setTaskInstancesToRender(
-                        Object.values(metadata).map(({ task_instances, failed_indices, failure_scores, plans }) => {
-                          task_instances = task_instances.map(([[x, y, z]], index) => [x, y, z, { plans: plans[index], failed: false }])
-                          failed_indices.forEach((index, i) => {
-                            task_instances[index].at(-1).failed = true
-                            task_instances[index].at(-1).score = failure_scores[i]
-                          })
-                          return task_instances
-                        }).flat()
-                      )
+                    const renderPoints = []
+                    demonstrations.forEach((demo, index) => {
+                      const [x, y, z] = demo.object_poses.split('\n').map(line => line.trim()).filter(line => line.length).slice(0,3).map(row=> parseFloat(row.split(',').at(-1)))
+                      const arm = Object.values(bandit_arms).find(arm => {
+                        const [[x_min, x_max], [y_min, y_max], _] = arm.segment
+                        return (x_min <= x) && (x <= x_max) && (y_min <= y) && (y <= y_max)
+                      })
+                      if (arm === undefined) {
+                        alert(`Object pose used in demonstration #${index + 1} is outside the workspace`)
+                        return
+                      }
+                      renderPoints.push([x, y, z, {
+                        id: demo.id,
+                        score: demo.score,
+                        joint_angles: demo.joint_angles.split('\n').map(line => line.trim()).filter(line => line.length).slice(1).map(row=> row.split(',').slice(0,8).map(num => parseFloat(num)))
+                      }])
+                      arm.demos.push(demo)
+                    })
 
-                      setProbabilityHeatMap(
-                        Object.fromEntries(
-                          Object.entries(metadata)
-                          .map(([arm_id, { task_instances, failed_indices }]) => [arm_id, failed_indices.length / task_instances.length ])
+                    setDemonstrationsToRender(renderPoints)
+                    setProcessing(true)
+
+                    /*
+                      This algorithm gives ε-optimal arm with probability 1 − δ
+                      Each arm must be sampled at least 1/2ε² * ln(2K/δ) times.
+                      Both ε and δ should be small numbers
+                    */
+                    naivePAC({
+                      dimensions,
+                      initial_joint_config,
+                      n_objects,
+                      demonstrations,
+                      arms: bandit_arms,
+                      onFinishCallback: ({ metadata, worst_arm_index, worst_arm_failure_probability, next_demonstration }) => {
+                        setDemonstrationAvailable(true)
+                        if (next_demonstration !== null)
+                          setNextDemonstrationToRender(next_demonstration)
+
+                        setTaskInstancesToRender(
+                          Object.values(metadata).map(({ task_instances, failed_indices, failure_scores, plans }) => {
+                            task_instances = task_instances.map(([[x, y, z]], index) => [x, y, z, { plans: plans[index], failed: false }])
+                            failed_indices.forEach((index, i) => {
+                              task_instances[index].at(-1).failed = true
+                              task_instances[index].at(-1).score = failure_scores[i]
+                            })
+                            return task_instances
+                          }).flat()
                         )
-                      )
 
-                      setProcessing(false)
-                    }
+                        setProbabilityHeatMap(
+                          Object.fromEntries(
+                            Object.entries(metadata)
+                            .map(([arm_id, { task_instances, failed_indices }]) => [arm_id, failed_indices.length / task_instances.length ])
+                          )
+                        )
+
+                        setProcessing(false)
+                      }
+                    })
                   })
-                })
-                .catch(error => alert(error))
-                .finally(() => callBack())
-              )
-            }
-          }}/>
+                  .catch(error => alert(error))
+                  .finally(() => callBack())
+                )
+              }
+            }}/>
+            <span>Wait <input type='number' name='tentacles' min={4} max={10} value={waitTime} onChange={e => setWaitTime(Number(e.target.value))} /> seconds</span>
+          </div>
           <>
             {!demonstrationAvailable ? <h3>Robot's Workspace</h3> : <h3>Robot's Belief</h3>}
             <div style={{ display: 'flex', flexDirection: 'column', margin: '0 auto', justifyContent: 'center', alignItems: 'center', position: 'relative' }}>

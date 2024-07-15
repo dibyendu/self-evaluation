@@ -6,7 +6,7 @@ import time
 import signal
 import subprocess
 from flask_cors import CORS
-from flask import Flask, jsonify, send_from_directory
+from flask import Flask, jsonify, request, send_from_directory
 
 
 # if changed, make sure to update it in self-evaluation/web_assembly/src/Config.js
@@ -59,19 +59,22 @@ def init():
   return jsonify({ 'status': True if error is None else False })
 
 
-@app.route('/start')
+@app.route('/start', methods=['POST'])
 def start():
+  joint_config = ','.join(map(lambda x: str(x), request.json['joint_config']))
+  wait_time = int(request.json['wait_time'])
   rcfile = generate_rcfile()
   file = open('%s.sh' % rcfile, 'w')
   file.write('''#!/bin/bash
 source ~/miniconda3/bin/deactivate
 source %s
+rosrun baxter_examples left_home_config.py --joint_config %s
 rosrun baxter_examples joint_recorder.py --file %s.csv &
 echo $! > /tmp/$$.pid
-echo %s > /tmp/$!.pid''' % (rcfile, rcfile, rcfile))
+echo %s > /tmp/$!.pid''' % (rcfile, joint_config, rcfile, rcfile))
   file.close()
   process = subprocess.Popen(['bash', '%s.sh' % rcfile], cwd=workspace_path, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, env=env, universal_newlines=True)
-  time.sleep(2)
+  time.sleep(wait_time)
   process.terminate()
   return jsonify({ 'pid': process.pid })
 
@@ -96,7 +99,6 @@ def stop(pid):
 
   os.system('rm -f /tmp/%s.pid /tmp/%s.pid %s*' % (pid, pid1, rcfile))
   return jsonify({ 'demonstration': data })
-
 
 
 if __name__ == '__main__':
