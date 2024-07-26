@@ -14,14 +14,17 @@ import robotImageUrl from './img/robot_top_view.svg'
 import DropZone, { DropZoneWrapper } from './DropZone'
 
 
+const ε = 0.02
+const δ = 0.05
+const β = 0.95
+
 
 const defaultWorkSpaceTheme = {
   border: { width: 1, color: '#000000' },
   scale: 1100,
   heatmapColor: { red: 100, green: 100, blue: 100 },
-  nextDemonstration: { size: 8, color: '#000000', border: 2 },
   demonstration: { size: 14, color: '#000000', textColor: '#ffffff' },
-  taskInstance: { size: 6, success: '#00ff00', failure: '#ff0000' }
+  taskInstance: { size: 6, success: '#00ff00', failure: '#ff0000', hint: '#ffff00' }
 }
 
 const robotImageWidth = 400
@@ -128,7 +131,7 @@ function PlanInfo({ style, position, plans }) {
                     <span className='material-symbols-rounded' style={{ cursor: 'pointer', verticalAlign: 'text-bottom' }} onClick={() => {
                       const state = { plan, position, screw_segments }
                       localStorage.setItem('navigation_state', JSON.stringify(state))
-                      window.open('/visualise.html', '_blank', 'noreferrer')
+                      window.open('/visualise', '_blank', 'noreferrer')
                     }}>
                       visibility
                     </span>
@@ -149,6 +152,7 @@ export default function App() {
   const [demoConfigAvailable, setDemoConfigAvailable] = useState(false)
   const [robotConfigAvailable, setRobotConfigAvailable] = useState(false)
   const [demonstrationAvailable, setDemonstrationAvailable] = useState(false)
+  const [confidenceMessage, setConfidenceMessage] = useState('')
 
   const [workSpaceConfig, setWorkSpaceConfig] = useState(null)
 
@@ -248,7 +252,12 @@ export default function App() {
             }}/>
             :
             <>
-              {!demonstrationAvailable ? <h3>Robot's Workspace</h3> : <h3>Robot's Belief</h3> }
+              {!demonstrationAvailable ? <h3>Robot's Workspace</h3> : (
+                <>
+                  <h3 style={{ margin: 0 }}>Robot's Belief</h3>
+                  <h4 style={{ marginTop: 0, color: 'green' }}>{confidenceMessage}</h4>
+                </>
+              )}
               <DropZoneWrapper
                 style={{ position: 'relative' }}
                 getFiles={fileMap => {
@@ -415,6 +424,9 @@ export default function App() {
                         if (next_demonstration !== null)
                           setNextDemonstrationToRender(next_demonstration)
 
+                        if (worst_arm_failure_probability < 1 + ε - β)
+                          setConfidenceMessage(`with ${(1- δ) * 100}% confidence, the overall success probability is ≥ ${β * 100}%`)
+
                         setTaskInstancesToRender(
                           Object.values(metadata).map(({ task_instances, failed_indices, failure_scores, plans }) => {
                             task_instances = task_instances.map(([[x, y, z]], index) => [x, y, z, { plans: plans[index], failed: false }])
@@ -482,27 +494,30 @@ export default function App() {
                   })
                 }
                 {
-                  taskInstancesToRender.map(([x, y, z, { plans, failed, score }], index) => 
-                    <PlanInfo
-                      key={index}
-                      style={{
-                        position: 'absolute',
-                        opacity: 0.8,
-                        cursor: 'pointer',
-                        backgroundColor: failed ? workSpaceTheme.taskInstance.failure : workSpaceTheme.taskInstance.success,
-                        width: workSpaceTheme.taskInstance.size,
-                        height: workSpaceTheme.taskInstance.size,
-                        borderRadius: workSpaceTheme.taskInstance.size / 2,
-                        top: (workSpaceConfig.x.max - x) * workSpaceTheme.scale - workSpaceTheme.taskInstance.size / 2,
-                        left: (workSpaceConfig.y.max - y) * workSpaceTheme.scale - workSpaceTheme.taskInstance.size / 2
-                      }}
-                      position={[x, y, z]}
-                      plans={plans}
-                    />
-                  )
+                  taskInstancesToRender.map(([x, y, z, { plans, failed, score }], index) => {
+                    const isNextDemo = nextDemonstrationToRender.some(([xn, yn]) => Math.abs(xn - x) < 1e-8  && Math.abs(yn - y) < 1e-8)
+                    return (
+                      <PlanInfo
+                        key={index}
+                        style={Object.assign({
+                          cursor: 'pointer',
+                          position: 'absolute',
+                          opacity: isNextDemo ? 1 : 0.8,
+                          backgroundColor: isNextDemo ? workSpaceTheme.taskInstance.hint : (failed ? workSpaceTheme.taskInstance.failure : workSpaceTheme.taskInstance.success),
+                          width: workSpaceTheme.taskInstance.size,
+                          height: workSpaceTheme.taskInstance.size,
+                          borderRadius: workSpaceTheme.taskInstance.size / 2,
+                          top: (workSpaceConfig.x.max - x) * workSpaceTheme.scale - workSpaceTheme.taskInstance.size / 2,
+                          left: (workSpaceConfig.y.max - y) * workSpaceTheme.scale - workSpaceTheme.taskInstance.size / 2
+                        }, isNextDemo ? { zIndex: 1 } : {})}
+                        position={[x, y, z]}
+                        plans={plans}
+                      />
+                    )
+                  })
                 }
                 {
-                  demonstrationsToRender.map(([x, y, z, { id, score, joint_angles }], index) => 
+                  demonstrationsToRender.map(([x, y, z, { id, score, joint_angles }], index) =>
                     <span
                       key={index}
                       title={`Score: ${score}`}
@@ -524,30 +539,11 @@ export default function App() {
                         joint_angles = nj.array(joint_angles)
                         const state = { plan: joint_angles.slice(null, [1,8]).tolist(), timestamps: joint_angles.slice(null, [0,1]).tolist().flat(), position: [x, y, z] }                        
                         localStorage.setItem('navigation_state', JSON.stringify(state))
-                        window.open('/visualise.html', '_blank', 'noreferrer')
+                        window.open('/visualise', '_blank', 'noreferrer')
                       }}
                     >
                       {id}
                     </span>
-                  )
-                }
-                {
-                  nextDemonstrationToRender.map(([x, y], index) => 
-                    <span
-                      key={index}
-                      style={{
-                        position: 'absolute',
-                        backgroundColor: 'transparent',
-                        opacity: 0.8,
-                        zIndex: 1,
-                        width: workSpaceTheme.nextDemonstration.size,
-                        height: workSpaceTheme.nextDemonstration.size,
-                        borderRadius: (workSpaceTheme.nextDemonstration.size + 2 * workSpaceTheme.nextDemonstration.border) / 2,
-                        border: `${workSpaceTheme.nextDemonstration.border}px solid ${workSpaceTheme.nextDemonstration.color}`,
-                        top: (workSpaceConfig.x.max - x) * workSpaceTheme.scale - (workSpaceTheme.nextDemonstration.size + 2 * workSpaceTheme.nextDemonstration.border) / 2,
-                        left: (workSpaceConfig.y.max - y) * workSpaceTheme.scale - (workSpaceTheme.nextDemonstration.size + 2 * workSpaceTheme.nextDemonstration.border) / 2
-                      }}
-                    />
                   )
                 }
               </DropZoneWrapper>
@@ -565,6 +561,7 @@ export default function App() {
                       x: { ...config.x, n_segments: parseInt(value) }
                     }))
                     setDemonstrationAvailable(false)
+                    setConfidenceMessage('')
                     setProbabilityHeatMap({})
                     setTaskInstancesToRender([])
                     setDemonstrationsToRender([])
@@ -585,6 +582,7 @@ export default function App() {
                       y: { ...config.y, n_segments: parseInt(value) }
                     }))
                     setDemonstrationAvailable(false)
+                    setConfidenceMessage('')
                     setProbabilityHeatMap({})
                     setTaskInstancesToRender([])
                     setDemonstrationsToRender([])
@@ -612,6 +610,7 @@ export default function App() {
                     <span className='material-symbols-rounded' title='Reset saved demonstrations' style={{ cursor: 'pointer', fontSize: 40 }} onClick={() => {
                       sessionStorage.removeItem('demonstrations')
                       setDemonstrationAvailable(false)
+                      setConfidenceMessage('')
                       setProbabilityHeatMap({})
                       setTaskInstancesToRender([])
                       setDemonstrationsToRender([])
@@ -629,6 +628,7 @@ export default function App() {
                     sessionStorage.clear()
                     setDemoConfigAvailable(false)
                     setDemonstrationAvailable(false)
+                    setConfidenceMessage('')
                     setProbabilityHeatMap({})
                     setTaskInstancesToRender([])
                     setDemonstrationsToRender([])
@@ -647,6 +647,7 @@ export default function App() {
                     setRobotConfigAvailable(false)
                     setDemoConfigAvailable(false)
                     setDemonstrationAvailable(false)
+                    setConfidenceMessage('')
                     setProbabilityHeatMap({})
                     setTaskInstancesToRender([])
                     setDemonstrationsToRender([])

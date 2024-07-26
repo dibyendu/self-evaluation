@@ -12,10 +12,10 @@ export default defineConfig({
   build: {
     outDir: '../frontend',
     rollupOptions: {
-      input: {
-        main: resolve(__dirname, 'src', 'index.html'),
-        visualise: resolve(__dirname, 'src', 'visualise.html')
-      }
+      input: [
+        resolve(__dirname, 'src', 'index.html'),
+        resolve(__dirname, 'src', 'visualise.html')
+      ]
     }
   },
   worker: {

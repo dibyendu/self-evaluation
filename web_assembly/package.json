@@ -1,11 +1,12 @@
 {
-  "name": "bandit-interface",
+  "name": "self-evaluation",
   "version": "1.0.0",
-  "description": "Multi-Arm Bandit Interface",
+  "description": "Self Evaluation using Multi-Arm Bandit",
   "private": true,
   "scripts": {
     "start": "vite",
-    "build": "vite build --emptyOutDir"
+    "build": "vite build --emptyOutDir",
+    "preview": "vite preview"
   },
   "keywords": [],
   "author": "Dibyendu Das",
