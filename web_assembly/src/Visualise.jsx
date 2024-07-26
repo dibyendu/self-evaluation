@@ -575,7 +575,6 @@ export default function App() {
     const container = document.getElementById('task-space')
 
     let { plan, timestamps, position: objectPosition, screw_segments } = JSON.parse(localStorage.getItem('navigation_state'))
-    localStorage.removeItem('navigation_state')
 
 
     objectPosition = objectPosition.map(p => p * positionScale)

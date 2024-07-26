@@ -19,15 +19,17 @@ const robotConfiguration = import.meta.glob('../../baxter_config/*.csv', { query
 import demonstrationConfiguration from '../../demonstration_config.json'
 
 
+const ε = 0.02
+const δ = 0.05
+const β = 0.95
 
 
 const defaultWorkSpaceTheme = {
   border: { width: 1, color: '#000000' },
   scale: 1100,
   heatmapColor: { red: 100, green: 100, blue: 100 },
-  nextDemonstration: { size: 8, color: '#000000', border: 2 },
   demonstration: { size: 14, color: '#000000', textColor: '#ffffff' },
-  taskInstance: { size: 6, success: '#00ff00', failure: '#ff0000' }
+  taskInstance: { size: 6, success: '#00ff00', failure: '#ff0000', hint: '#ffff00' }
 }
 
 const robotImageWidth = 400
@@ -195,6 +197,7 @@ export default function App() {
   const [demoConfigAvailable, setDemoConfigAvailable] = useState(false)
   const [robotConfigAvailable, setRobotConfigAvailable] = useState(false)
   const [demonstrationAvailable, setDemonstrationAvailable] = useState(false)
+  const [confidenceMessage, setConfidenceMessage] = useState('')
 
   const [workSpaceConfig, setWorkSpaceConfig] = useState(null)
 
@@ -431,6 +434,9 @@ export default function App() {
                         if (next_demonstration !== null)
                           setNextDemonstrationToRender(next_demonstration)
 
+                        if (worst_arm_failure_probability < 1 + ε - β)
+                          setConfidenceMessage(`with ${(1- δ) * 100}% confidence, the overall success probability is ≥ ${β * 100}%`)
+
                         setTaskInstancesToRender(
                           Object.values(metadata).map(({ task_instances, failed_indices, failure_scores, plans }) => {
                             task_instances = task_instances.map(([[x, y, z]], index) => [x, y, z, { plans: plans[index], failed: false }])
@@ -461,7 +467,12 @@ export default function App() {
             <span>Wait <input type='number' name='tentacles' min={4} max={10} value={waitTime} onChange={e => setWaitTime(Number(e.target.value))} /> seconds</span>
           </div>
           <>
-            {!demonstrationAvailable ? <h3>Robot's Workspace</h3> : <h3>Robot's Belief</h3>}
+            {!demonstrationAvailable ? <h3>Robot's Workspace</h3> : (
+              <>
+                <h3 style={{ margin: 0 }}>Robot's Belief</h3>
+                <h4 style={{ marginTop: 0, color: 'green' }}>{confidenceMessage}</h4>
+              </>
+            )}
             <div style={{ display: 'flex', flexDirection: 'column', margin: '0 auto', justifyContent: 'center', alignItems: 'center', position: 'relative' }}>
               <img
                 src={robotImageUrl}
@@ -518,27 +529,30 @@ export default function App() {
                 })
               }
               {
-                taskInstancesToRender.map(([x, y, z, { plans, failed, score }], index) => 
-                  <PlanInfo
-                    key={index}
-                    style={{
-                      position: 'absolute',
-                      opacity: 0.8,
-                      cursor: 'pointer',
-                      backgroundColor: failed ? workSpaceTheme.taskInstance.failure : workSpaceTheme.taskInstance.success,
-                      width: workSpaceTheme.taskInstance.size,
-                      height: workSpaceTheme.taskInstance.size,
-                      borderRadius: workSpaceTheme.taskInstance.size / 2,
-                      top: (workSpaceConfig.x.max - x) * workSpaceTheme.scale - workSpaceTheme.taskInstance.size / 2,
-                      left: (workSpaceConfig.y.max - y) * workSpaceTheme.scale - workSpaceTheme.taskInstance.size / 2
-                    }}
-                    position={[x, y, z]}
-                    plans={plans}
-                  />
-                )
+                taskInstancesToRender.map(([x, y, z, { plans, failed, score }], index) => {
+                  const isNextDemo = nextDemonstrationToRender.some(([xn, yn]) => Math.abs(xn - x) < 1e-8  && Math.abs(yn - y) < 1e-8)
+                  return (
+                    <PlanInfo
+                      key={index}
+                      style={Object.assign({
+                        cursor: 'pointer',
+                        position: 'absolute',
+                        opacity: isNextDemo ? 1 : 0.8,
+                        backgroundColor: isNextDemo ? workSpaceTheme.taskInstance.hint : (failed ? workSpaceTheme.taskInstance.failure : workSpaceTheme.taskInstance.success),
+                        width: workSpaceTheme.taskInstance.size,
+                        height: workSpaceTheme.taskInstance.size,
+                        borderRadius: workSpaceTheme.taskInstance.size / 2,
+                        top: (workSpaceConfig.x.max - x) * workSpaceTheme.scale - workSpaceTheme.taskInstance.size / 2,
+                        left: (workSpaceConfig.y.max - y) * workSpaceTheme.scale - workSpaceTheme.taskInstance.size / 2
+                      }, isNextDemo ? { zIndex: 1 } : {})}
+                      position={[x, y, z]}
+                      plans={plans}
+                    />
+                  )
+                })
               }
               {
-                demonstrationsToRender.map(([x, y, z, { id, score, joint_angles }], index) => 
+                demonstrationsToRender.map(([x, y, z, { id, score, joint_angles }], index) =>
                   <span
                     key={index}
                     title={`Score: ${score}`}
@@ -565,25 +579,6 @@ export default function App() {
                   >
                     {id}
                   </span>
-                )
-              }
-              {
-                nextDemonstrationToRender.map(([x, y], index) => 
-                  <span
-                    key={index}
-                    style={{
-                      position: 'absolute',
-                      backgroundColor: 'transparent',
-                      opacity: 0.8,
-                      zIndex: 1,
-                      width: workSpaceTheme.nextDemonstration.size,
-                      height: workSpaceTheme.nextDemonstration.size,
-                      borderRadius: (workSpaceTheme.nextDemonstration.size + 2 * workSpaceTheme.nextDemonstration.border) / 2,
-                      border: `${workSpaceTheme.nextDemonstration.border}px solid ${workSpaceTheme.nextDemonstration.color}`,
-                      top: (workSpaceConfig.x.max - x) * workSpaceTheme.scale - (workSpaceTheme.nextDemonstration.size + 2 * workSpaceTheme.nextDemonstration.border) / 2,
-                      left: (workSpaceConfig.y.max - y) * workSpaceTheme.scale - (workSpaceTheme.nextDemonstration.size + 2 * workSpaceTheme.nextDemonstration.border) / 2
-                    }}
-                  />
                 )
               }
               { showObjectPoseHint && userClickPose !== null && (
@@ -613,6 +608,7 @@ export default function App() {
                       x: { ...config.x, n_segments: parseInt(value) }
                     }))
                     setDemonstrationAvailable(false)
+                    setConfidenceMessage('')
                     setProbabilityHeatMap({})
                     setTaskInstancesToRender([])
                     setDemonstrationsToRender([])
@@ -633,6 +629,7 @@ export default function App() {
                       y: { ...config.y, n_segments: parseInt(value) }
                     }))
                     setDemonstrationAvailable(false)
+                    setConfidenceMessage('')
                     setProbabilityHeatMap({})
                     setTaskInstancesToRender([])
                     setDemonstrationsToRender([])
@@ -660,6 +657,7 @@ export default function App() {
                     <span className='material-symbols-rounded' title='Reset saved demonstrations' style={{ cursor: 'pointer', fontSize: 40 }} onClick={() => {
                       sessionStorage.removeItem('demonstrations')
                       setDemonstrationAvailable(false)
+                      setConfidenceMessage('')
                       setProbabilityHeatMap({})
                       setTaskInstancesToRender([])
                       setDemonstrationsToRender([])
@@ -679,6 +677,7 @@ export default function App() {
                     setRobotConfigAvailable(false)
                     setDemoConfigAvailable(false)
                     setDemonstrationAvailable(false)
+                    setConfidenceMessage('')
                     setProbabilityHeatMap({})
                     setTaskInstancesToRender([])
                     setDemonstrationsToRender([])
