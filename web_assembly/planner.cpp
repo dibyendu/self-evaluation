@@ -1,4 +1,4 @@
-// emcc -std=c++11 -O2 ../kinlib/*.cpp server.cpp -o src/server.mjs -s ALLOW_MEMORY_GROWTH -lembind
+// emcc -std=c++11 -O2 ../kinlib/*.cpp planner.cpp -o src/planner.mjs -s ALLOW_MEMORY_GROWTH -lembind
 
 #include <array>
 #include <vector>
@@ -143,26 +143,26 @@ std::vector<std::vector<PlanInfo>> motionPlan(
 
   std::vector<std::vector<PlanInfo>> plans;
   for (int i = 0; i < n_task_instances; i++) {
-    Eigen::VectorXd jnt_val = init_jnt_val;
-    std::vector<PlanInfo> current_plans;
+    std::vector<PlanInfo> task_plans;
     for (int j = 0; j < n_demontrations; j++) {
       PlanInfo plan;
-      std::vector<Eigen::Matrix4d> motion_plan;
-      kinlib::UserGuidedMotionPlanner::planMotionForNewTaskInstance(demonstrations[j].demo, task_instances[i], motion_plan);
+      Eigen::VectorXd jnt_val = init_jnt_val;
+      std::vector<Eigen::Matrix4d> guiding_poses;
+      kinlib::UserGuidedMotionPlanner::planMotionForNewTaskInstance(demonstrations[j].demo, task_instances[i], guiding_poses);
 
       int screw_segment = 0;
       plan.is_successful = true;
       plan.demo_id = demonstrations[j].id;
       std::vector<Eigen::VectorXd> joint_angles;
       std::vector<std::vector<double>> plan_joint_angles;
-      for (auto goal_pose : motion_plan) {
+      for (auto guiding_pose : guiding_poses) {
         Eigen::Matrix4d init_ee_g;
         kinSolver.getFK(jnt_val, init_ee_g);
 
         // Get motion plan using ScLERP Planner
         kinlib::MotionPlanResult plan_info;
         std::vector<Eigen::VectorXd> plan_result;
-        kinlib::ErrorCodes code = kinSolver.getMotionPlan(jnt_val, init_ee_g, goal_pose, plan_result, plan_info);
+        kinlib::ErrorCodes code = kinSolver.getMotionPlan(jnt_val, init_ee_g, guiding_pose, plan_result, plan_info);
 
         joint_angles.reserve(joint_angles.size() + distance(plan_result.begin(), plan_result.end()));
         joint_angles.insert(joint_angles.end(), plan_result.begin(), plan_result.end());
@@ -178,7 +178,7 @@ std::vector<std::vector<PlanInfo>> motionPlan(
         } else {
           int joint_id = plan_info.result == kinlib::MotionPlanReturnCodes::JOINT_LIMITS_VIOLATED ? plan_info.joint_id : -1;
           plan.is_successful = false;
-          plan.plan_length = motion_plan.size();
+          plan.plan_length = guiding_poses.size();
           plan.failed_screw_segment = screw_segment + 1;
           plan.failed_joint_id = joint_id;
           plan.joint_angles = plan_joint_angles;
@@ -187,14 +187,14 @@ std::vector<std::vector<PlanInfo>> motionPlan(
       }
 
       if (plan.is_successful) {
-        plan.plan_length = motion_plan.size();
+        plan.plan_length = guiding_poses.size();
         plan.joint_angles = plan_joint_angles;
-        current_plans.push_back(plan);
+        task_plans.push_back(plan);
         break;
       }
-      current_plans.push_back(plan);
+      task_plans.push_back(plan);
     }
-    plans.push_back(current_plans);
+    plans.push_back(task_plans);
   }
 
   free(task_instances);

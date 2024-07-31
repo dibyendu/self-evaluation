@@ -5,9 +5,9 @@
 
 `cd web_assembly`
 
-### Compile the server code
+### Compile the planner code
 
-`emcc -std=c++11 -O2 ../kinlib/*.cpp server.cpp -o src/server.mjs -s ALLOW_MEMORY_GROWTH -lembind`
+`emcc -std=c++11 -O2 ../kinlib/*.cpp planner.cpp -o src/planner.mjs -s ALLOW_MEMORY_GROWTH -lembind`
 
 ### Start application
 `npm start`
@@ -15,9 +15,9 @@
 
 # Run in client-server mode
 
-### Compile the server code
+### Compile the planner code
 
-`g++ -std=c++11 -O2 kinlib/*.cpp server.cpp -o server -lpthread`
+`g++ -std=c++11 -O2 kinlib/*.cpp planner.cpp -o server -lpthread`
 
 ### Start server
 `./server`

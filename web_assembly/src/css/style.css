@@ -14,3 +14,10 @@
 }
 
 @keyframes l4 {to{transform: rotate(1turn)}}
+
+
+dialog div {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between
+}

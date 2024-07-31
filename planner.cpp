@@ -1,4 +1,4 @@
-// g++ -std=c++11 -O2 kinlib/*.cpp server.cpp -o server -lpthread
+// g++ -std=c++11 -O2 kinlib/*.cpp planner.cpp -o server -lpthread
 
 #ifdef __APPLE__
   #include <libkern/OSByteOrder.h>
@@ -161,25 +161,22 @@ void *planner_thread(void *args) {
       end_index = arg->end_index;
 
   for (int i = start_index; i <= end_index; i++) {
-
-    Eigen::VectorXd jnt_val = init_jnt_val;
-
     for (int j = 0; j < n_demontrations; j++) {
-      
-      std::vector<Eigen::Matrix4d> motion_plan;
-      kinlib::UserGuidedMotionPlanner::planMotionForNewTaskInstance(demontrations[j].demo, task_instances[i], motion_plan);
+      Eigen::VectorXd jnt_val = init_jnt_val;
+      std::vector<Eigen::Matrix4d> guiding_poses;
+      kinlib::UserGuidedMotionPlanner::planMotionForNewTaskInstance(demontrations[j].demo, task_instances[i], guiding_poses);
 
       int screw_segment = 0;
       bool plan_successful = true;
       std::vector<Eigen::VectorXd> joint_angles;
-      for (auto goal_pose : motion_plan) {
+      for (auto guiding_pose : guiding_poses) {
         Eigen::Matrix4d init_ee_g;
         kin_solver.getFK(jnt_val, init_ee_g);
 
         // Get motion plan using ScLERP Planner
         kinlib::MotionPlanResult plan_info;
         std::vector<Eigen::VectorXd> plan_result;
-        kinlib::ErrorCodes code = kin_solver.getMotionPlan(jnt_val, init_ee_g, goal_pose, plan_result, plan_info);
+        kinlib::ErrorCodes code = kin_solver.getMotionPlan(jnt_val, init_ee_g, guiding_pose, plan_result, plan_info);
 
         joint_angles.reserve(joint_angles.size() + distance(plan_result.begin(), plan_result.end()));
         joint_angles.insert(joint_angles.end(), plan_result.begin(), plan_result.end());
@@ -190,7 +187,7 @@ void *planner_thread(void *args) {
         } else {
           int joint_id = plan_info.result == kinlib::MotionPlanReturnCodes::JOINT_LIMITS_VIOLATED ? plan_info.joint_id : -1;
           plan_successful = false;
-          plans[i][j].plan_length = motion_plan.size();
+          plans[i][j].plan_length = guiding_poses.size();
           plans[i][j].is_successful = false;
           plans[i][j].joint_angles = joint_angles;
           plans[i][j].failed_screw_segment = screw_segment + 1;
@@ -200,7 +197,7 @@ void *planner_thread(void *args) {
       }
 
       if (plan_successful) {
-        plans[i][j].plan_length = motion_plan.size();
+        plans[i][j].plan_length = guiding_poses.size();
         plans[i][j].is_successful = true;
         plans[i][j].joint_angles = joint_angles;
         break;

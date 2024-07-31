@@ -4,6 +4,7 @@ import nj from 'https://esm.run/numjs'
 
 import './css/style.css'
 import {
+  ε, δ, β,
   demonstrationFiles,
   robotConfigurationFiles,
   demonstrationConfigurationFile,
@@ -12,11 +13,6 @@ import {
 import naivePAC from './Bandit'
 import robotImageUrl from './img/robot_top_view.svg'
 import DropZone, { DropZoneWrapper } from './DropZone'
-
-
-const ε = 0.02
-const δ = 0.05
-const β = 0.95
 
 
 const defaultWorkSpaceTheme = {
@@ -73,21 +69,25 @@ function cartesianProduct(iterables, repeat) {
 function Theme({ open, setOpen, applyTheme }) {
 
   const [theme, setTheme] = useState(defaultWorkSpaceTheme)
-  
+
   return (
-    <dialog open={open} style={{ backgroundColor: '#fff', zIndex: 2 }}>
+    <dialog open={open} style={{ backgroundColor: '#fff', zIndex: 2, width: '25%' }}>
       <p>Select your colours</p>
       <div>
-        <label htmlFor='border'>Border: </label>
+        <label htmlFor='border'>Border</label>
         <input type='color' id='border' value={theme.border.color} onChange={({ target: { value }}) => setTheme(prev => ({ ...prev, border: { ...prev.border, color: value } }))} />
       </div>
       <div>
-        <label htmlFor='task-success'>Successfull task instance: </label>
+        <label htmlFor='task-failure'>Failed Task Instances</label>
+        <input type='color' id='task-failure' value={theme.taskInstance.failure} onChange={({ target: { value }}) => setTheme(prev => ({ ...prev, taskInstance: { ...prev.taskInstance, failure: value } }))} />
+      </div>
+      <div>
+        <label htmlFor='task-success'>Successfull Task Instances</label>
         <input type='color' id='task-success' value={theme.taskInstance.success} onChange={({ target: { value }}) => setTheme(prev => ({ ...prev, taskInstance: { ...prev.taskInstance, success: value } }))} />
       </div>
       <div>
-        <label htmlFor='task-failure'>Failed task instance: </label>
-        <input type='color' id='task-failure' value={theme.taskInstance.failure} onChange={({ target: { value }}) => setTheme(prev => ({ ...prev, taskInstance: { ...prev.taskInstance, failure: value } }))} />
+        <label htmlFor='task-hint'>Next Demonstration Hint</label>
+        <input type='color' id='task-hint' value={theme.taskInstance.hint} onChange={({ target: { value }}) => setTheme(prev => ({ ...prev, taskInstance: { ...prev.taskInstance, hint: value } }))} />
       </div>
       <button onClick={() => {
         setOpen(false)
@@ -125,8 +125,8 @@ function PlanInfo({ style, position, plans }) {
               {plans.map(({ demonstration_id, is_successful, failed_joint_angle, failed_screw_segment, plan, screw_segments }, index) =>
                 <tr key={index} style={{ textAlign: 'center', backgroundColor: is_successful ? '#c5ffae': '#ff9797' }}>
                   <td>{demonstration_id}</td>
-                  <td>{failed_joint_angle}</td>
-                  <td>{failed_screw_segment}</td>
+                  <td>{is_successful || failed_joint_angle === -1 ? '' : failed_joint_angle}</td>
+                  <td>{is_successful || failed_joint_angle === -1 ? '' : failed_screw_segment}</td>
                   <td>
                     <span className='material-symbols-rounded' style={{ cursor: 'pointer', verticalAlign: 'text-bottom' }} onClick={() => {
                       const state = { plan, position, screw_segments }
@@ -419,6 +419,8 @@ export default function App() {
                       n_objects,
                       demonstrations,
                       arms: bandit_arms,
+                      epsilon: ε,
+                      delta: δ,
                       onFinishCallback: ({ metadata, worst_arm_index, worst_arm_failure_probability, next_demonstration }) => {
                         setDemonstrationAvailable(true)
                         if (next_demonstration !== null)

@@ -1,5 +1,5 @@
 import nj from 'https://esm.run/numjs'
-import WasmModule from './server.mjs'
+import WasmModule from './planner.mjs'
 
 
 function to_SE3(pose) {
@@ -11,12 +11,12 @@ function to_SE3(pose) {
 }
 
 
-function zip(a, b){
+function zip(a, b) {
   return a.map((v, i) => [v, b[i]])
 }
 
 
-function unzip(a){
+function unzip(a) {
   return a.reduce((acc, [l, h]) => {
     acc[0].push(l)
     acc[1].push(h)
