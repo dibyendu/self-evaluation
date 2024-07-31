@@ -3,6 +3,7 @@ import nj from 'https://esm.run/numjs'
 
 import './css/style.css'
 import {
+  ε, δ, β,
   backEndHost,
   demonstrationFiles,
   robotConfigurationFiles,
@@ -19,9 +20,6 @@ const robotConfiguration = import.meta.glob('../../baxter_config/*.csv', { query
 import demonstrationConfiguration from '../../demonstration_config.json'
 
 
-const ε = 0.02
-const δ = 0.05
-const β = 0.95
 
 
 const defaultWorkSpaceTheme = {
@@ -77,21 +75,25 @@ function cartesianProduct(iterables, repeat) {
 function Theme({ open, setOpen, applyTheme }) {
 
   const [theme, setTheme] = useState(defaultWorkSpaceTheme)
-  
+
   return (
-    <dialog open={open} style={{ backgroundColor: '#fff', zIndex: 2 }}>
+    <dialog open={open} style={{ backgroundColor: '#fff', zIndex: 2, width: '25%' }}>
       <p>Select your colours</p>
       <div>
-        <label htmlFor='border'>Border: </label>
+        <label htmlFor='border'>Border</label>
         <input type='color' id='border' value={theme.border.color} onChange={({ target: { value }}) => setTheme(prev => ({ ...prev, border: { ...prev.border, color: value } }))} />
       </div>
       <div>
-        <label htmlFor='task-success'>Successfull task instance: </label>
+        <label htmlFor='task-failure'>Failed Task Instances</label>
+        <input type='color' id='task-failure' value={theme.taskInstance.failure} onChange={({ target: { value }}) => setTheme(prev => ({ ...prev, taskInstance: { ...prev.taskInstance, failure: value } }))} />
+      </div>
+      <div>
+        <label htmlFor='task-success'>Successfull Task Instances</label>
         <input type='color' id='task-success' value={theme.taskInstance.success} onChange={({ target: { value }}) => setTheme(prev => ({ ...prev, taskInstance: { ...prev.taskInstance, success: value } }))} />
       </div>
       <div>
-        <label htmlFor='task-failure'>Failed task instance: </label>
-        <input type='color' id='task-failure' value={theme.taskInstance.failure} onChange={({ target: { value }}) => setTheme(prev => ({ ...prev, taskInstance: { ...prev.taskInstance, failure: value } }))} />
+        <label htmlFor='task-hint'>Next Demonstration Hint</label>
+        <input type='color' id='task-hint' value={theme.taskInstance.hint} onChange={({ target: { value }}) => setTheme(prev => ({ ...prev, taskInstance: { ...prev.taskInstance, hint: value } }))} />
       </div>
       <button onClick={() => {
         setOpen(false)
@@ -129,8 +131,8 @@ function PlanInfo({ style, position, plans }) {
               {plans.map(({ demonstration_id, is_successful, failed_joint_angle, failed_screw_segment, plan, screw_segments }, index) =>
                 <tr key={index} style={{ textAlign: 'center', backgroundColor: is_successful ? '#c5ffae': '#ff9797' }}>
                   <td>{demonstration_id}</td>
-                  <td>{failed_joint_angle}</td>
-                  <td>{failed_screw_segment}</td>
+                  <td>{is_successful || failed_joint_angle === -1 ? '' : failed_joint_angle}</td>
+                  <td>{is_successful || failed_joint_angle === -1 ? '' : failed_screw_segment}</td>
                   <td>
                     <span className='material-symbols-rounded' style={{ cursor: 'pointer', verticalAlign: 'text-bottom' }} onClick={() => {
                       const state = { plan, position, screw_segments }
@@ -197,7 +199,6 @@ export default function App() {
   const [demoConfigAvailable, setDemoConfigAvailable] = useState(false)
   const [robotConfigAvailable, setRobotConfigAvailable] = useState(false)
   const [demonstrationAvailable, setDemonstrationAvailable] = useState(false)
-  const [confidenceMessage, setConfidenceMessage] = useState('')
 
   const [workSpaceConfig, setWorkSpaceConfig] = useState(null)
 
@@ -429,13 +430,15 @@ export default function App() {
                       n_objects,
                       demonstrations,
                       arms: bandit_arms,
+                      epsilon: ε,
+                      delta: δ,
                       onFinishCallback: ({ metadata, worst_arm_index, worst_arm_failure_probability, next_demonstration }) => {
                         setDemonstrationAvailable(true)
                         if (next_demonstration !== null)
                           setNextDemonstrationToRender(next_demonstration)
 
                         if (worst_arm_failure_probability < 1 + ε - β)
-                          setConfidenceMessage(`with ${(1- δ) * 100}% confidence, the overall success probability is ≥ ${β * 100}%`)
+                          alert('No more demonstration is required')
 
                         setTaskInstancesToRender(
                           Object.values(metadata).map(({ task_instances, failed_indices, failure_scores, plans }) => {
@@ -467,12 +470,7 @@ export default function App() {
             <span>Wait <input type='number' name='tentacles' min={4} max={10} value={waitTime} onChange={e => setWaitTime(Number(e.target.value))} /> seconds</span>
           </div>
           <>
-            {!demonstrationAvailable ? <h3>Robot's Workspace</h3> : (
-              <>
-                <h3 style={{ margin: 0 }}>Robot's Belief</h3>
-                <h4 style={{ marginTop: 0, color: 'green' }}>{confidenceMessage}</h4>
-              </>
-            )}
+            {!demonstrationAvailable ? <h3>Robot's Workspace</h3> : <h3>Robot's Belief</h3>}
             <div style={{ display: 'flex', flexDirection: 'column', margin: '0 auto', justifyContent: 'center', alignItems: 'center', position: 'relative' }}>
               <img
                 src={robotImageUrl}
@@ -497,7 +495,6 @@ export default function App() {
                             <div
                               ref={row === 0 && column === 0 ? firstCellRef : null}
                               key={column}
-                              title={probability !== undefined ? `Failure probability: ${probability}` : ''}
                               style={Object.assign(
                                 {
                                   width: cellWidth,
@@ -608,7 +605,6 @@ export default function App() {
                       x: { ...config.x, n_segments: parseInt(value) }
                     }))
                     setDemonstrationAvailable(false)
-                    setConfidenceMessage('')
                     setProbabilityHeatMap({})
                     setTaskInstancesToRender([])
                     setDemonstrationsToRender([])
@@ -629,7 +625,6 @@ export default function App() {
                       y: { ...config.y, n_segments: parseInt(value) }
                     }))
                     setDemonstrationAvailable(false)
-                    setConfidenceMessage('')
                     setProbabilityHeatMap({})
                     setTaskInstancesToRender([])
                     setDemonstrationsToRender([])
@@ -657,7 +652,6 @@ export default function App() {
                     <span className='material-symbols-rounded' title='Reset saved demonstrations' style={{ cursor: 'pointer', fontSize: 40 }} onClick={() => {
                       sessionStorage.removeItem('demonstrations')
                       setDemonstrationAvailable(false)
-                      setConfidenceMessage('')
                       setProbabilityHeatMap({})
                       setTaskInstancesToRender([])
                       setDemonstrationsToRender([])
@@ -677,7 +671,6 @@ export default function App() {
                     setRobotConfigAvailable(false)
                     setDemoConfigAvailable(false)
                     setDemonstrationAvailable(false)
-                    setConfidenceMessage('')
                     setProbabilityHeatMap({})
                     setTaskInstancesToRender([])
                     setDemonstrationsToRender([])

@@ -1,3 +1,7 @@
+export const ε = 0.2
+export const δ = 0.05
+export const β = 0.95
+
 export const robotConfigurationFiles = {
   'baxter_joint_axes.csv': 'joint_axes',
   'baxter_joint_q.csv': 'joint_q',

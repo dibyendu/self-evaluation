@@ -15,6 +15,12 @@
 
 @keyframes l4 {to{transform: rotate(1turn)}}
 
+dialog div {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between
+}
+
 .button {
   background-color: #555;
   border: none;
@@ -26,17 +32,17 @@
   cursor: pointer;
   transition-duration: 0.4s;
   border-radius: 5px;
-  box-shadow: 0 12px 16px 0 rgba(0,0,0,0.24),0 17px 50px 0 rgba(0,0,0,0.19);
+  box-shadow: 0 12px 16px 0 rgba(0,0,0,0.24),0 17px 50px 0 rgba(0,0,0,0.19)
 }
 
 .button.disabled {
   opacity: 0.5;
-  cursor: not-allowed;
+  cursor: not-allowed
 }
 
 .button:hover {
   background-color: white;
-  color: #555;
+  color: #555
 }
 
 
@@ -44,11 +50,11 @@
   margin-right: 10px;
   padding: 0;
   box-sizing: border-box;
-  color: #fff;
+  color: #fff
 }
 
 .switch-container.disabled {
-  opacity: 0.5;
+  opacity: 0.5
 }
 
 .switch {
@@ -56,30 +62,30 @@
   position: relative;
   display: inline-block;
   width: 20em;
-  height: 2.6em;
+  height: 2.6em
 }
 
 .switch input {
   display: none;
   opacity: 0;
   width: 0;
-  height: 0;
+  height: 0
 }
 
 .switch input:checked + .slider .ball {
-  box-shadow: 10px 10px 100px #7f8996;
+  box-shadow: 10px 10px 100px #7f8996
 }
 
 .switch input:checked + .slider .title {
-  left: 40%;
+  left: 40%
 }
 
 .switch input:checked + .slider {
-  background-color: #26823a;
+  background-color: #26823a
 }
 
 .switch input:focus + .slider {
-  box-shadow: 10px 10px 100px #7f8996;
+  box-shadow: 10px 10px 100px #7f8996
 }
 
 .switch input:checked + .slider .ball {
@@ -97,11 +103,11 @@
   bottom: 0;
   background-color: #555;
   transition: all 0.4s;
-  border-radius: 30px;
+  border-radius: 30px
 }
 
 .switch .slider.disabled {
-  cursor: not-allowed;
+  cursor: not-allowed
 }
 
 .switch .slider .title {
@@ -114,7 +120,7 @@
   transition: all 0.4s;
   -webkit-user-select: none;
   -ms-user-select: none;
-  user-select: none;
+  user-select: none
 }
 
 .switch .slider .ball {
@@ -124,7 +130,7 @@
   border-radius: 50%;
   position: absolute;
   left: -1px;
-  transition: 0.4s;
+  transition: 0.4s
 }
 
 .switch .slider .ball .icon {
@@ -133,11 +139,11 @@
   left: 53%;
   transform: translate(-50%, -50%);
   color: #313033;
-  font-size: 12px;
+  font-size: 12px
 }
 
 .switch .slider .ball .icon svg {
   width: 24px;
   height: 24px;
-  color: rgb(31 41 55);
+  color: rgb(31 41 55)
 }

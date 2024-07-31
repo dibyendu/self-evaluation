@@ -3,7 +3,7 @@ import nj from 'https://esm.run/numjs'
 import { robotConfigurationFiles } from './Config'
 
 
-export default function naivePAC({ dimensions, initial_joint_config, n_objects, demonstrations, arms, onFinishCallback, epsilon=0.2, delta=0.05 }) {
+export default function naivePAC({ dimensions, initial_joint_config, n_objects, demonstrations, arms, epsilon=0.2, delta=0.05, onFinishCallback=() => {} }) {
   const n_arms = Object.keys(arms).length
   const n_samples_per_arm = Math.floor(Math.log(2 * n_arms / delta) / (2 * epsilon ** 2))
 
