@@ -26,8 +26,8 @@ const defaultWorkSpaceTheme = {
   border: { width: 1, color: '#000000' },
   scale: 1100,
   heatmapColor: { red: 100, green: 100, blue: 100 },
-  demonstration: { size: 14, color: '#000000', textColor: '#ffffff' },
-  taskInstance: { size: 6, success: '#00ff00', failure: '#ff0000', hint: '#ffff00' }
+  demonstration: { size: 12, color: '#000000', textColor: '#ffffff' },
+  taskInstance: { size: 4, success: '#00ff00', failure: '#ff0000', hint: '#ffff00' }
 }
 
 const robotImageWidth = 400
