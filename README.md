@@ -1,11 +1,11 @@
 ## Run on the Robot's server
 
+`cd ~/self-evaluation/web_assembly`
+
 ### Activate virtualenv
 `source ~/miniconda3/bin/activate py37`
 
-`cd ~/self-evaluation/web_assembly`
-
-### Install dependencies and build the files (one time action)
+### Install dependencies and build the files (only if the code changes)
 `npm i`
 
 `pip install -r backend/requirements.txt`
@@ -15,5 +15,5 @@
 ### Start the server
 `python backend/app.py`
 
-### Deactivate virtualenv
+### (Optionally) Deactivate virtualenv
 `source ~/miniconda3/bin/deactivate`

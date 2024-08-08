@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState, useRef } from 'react'
 import nj from 'https://esm.run/numjs'
+import JSZip from 'https://esm.run/jszip'
+import FileSaver from 'https://esm.run/file-saver'
 
 import './css/style.css'
 import {
@@ -121,9 +123,10 @@ function PlanInfo({ style, position, plans }) {
           <table>
             <thead>
               <tr style={{ textAlign: 'center' }}>
-                <th style={{ fontSize: 14 }}>Demo #</th>
-                <th style={{ fontSize: 14 }}>Joint #</th>
-                <th style={{ fontSize: 14 }}>Screw segment #</th>
+                <th style={{ fontSize: 14 }}>Demo</th>
+                <th style={{ fontSize: 14 }}>Joint</th>
+                <th style={{ fontSize: 14 }}>Screw segment</th>
+                <th style={{ fontSize: 14 }}>Download</th>
                 <th style={{ fontSize: 14 }}>Visualise</th>
               </tr>
             </thead>
@@ -133,6 +136,21 @@ function PlanInfo({ style, position, plans }) {
                   <td>{demonstration_id}</td>
                   <td>{is_successful || failed_joint_angle === -1 ? '' : failed_joint_angle}</td>
                   <td>{is_successful || failed_joint_angle === -1 ? '' : failed_screw_segment}</td>
+                  <td>
+                    <span className='material-symbols-rounded' style={{ cursor: 'pointer', verticalAlign: 'text-bottom' }} onClick={() => {
+                      const [x, y, z] = position
+                      const demonstration = JSON.parse(sessionStorage.getItem('demonstrations'))[demonstration_id]
+
+                      const zip = new JSZip()
+                      zip.file('object_position.txt', `x: ${x}\ny: ${y}\nz: ${z}`)
+                      zip.file('demonstration/object_pose.txt', demonstration.object_pose)
+                      zip.file('demonstration/joint_angle.csv', demonstration.joint_angle)
+                      zip.file('demonstration/region_of_interest.txt', `${demonstration.roi}`)
+                      zip.generateAsync({ type: 'blob' }).then(content => FileSaver.saveAs(content, 'plan.zip'))
+                    }}>
+                      download
+                    </span>
+                  </td>
                   <td>
                     <span className='material-symbols-rounded' style={{ cursor: 'pointer', verticalAlign: 'text-bottom' }} onClick={() => {
                       const state = { plan, position, screw_segments }
