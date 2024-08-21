@@ -223,7 +223,7 @@ export default function App() {
   const [robotImageDimensions, setRobotImageDimensions] = useState({ width: 0, height: 0 })
 
   const [processing, setProcessing] = useState(false)
-  const [waitTime, setWaitTime] = useState(10)
+  const [waitTime, setWaitTime] = useState(5)
   const [isPending, startAction] = useAsyncAction()
 
   const [probabilityHeatMap, setProbabilityHeatMap] = useState({})
