@@ -559,7 +559,7 @@ export default function App() {
                         borderRadius: workSpaceTheme.taskInstance.size / 2,
                         top: (workSpaceConfig.x.max - x) * workSpaceTheme.scale - workSpaceTheme.taskInstance.size / 2,
                         left: (workSpaceConfig.y.max - y) * workSpaceTheme.scale - workSpaceTheme.taskInstance.size / 2
-                      }, isNextDemo ? { zIndex: 1 } : {})}
+                      }, isNextDemo ? { zIndex: 1, boxShadow: `0 0 20px 20px ${workSpaceTheme.taskInstance.hint}66` } : {})}
                       position={[x, y, z]}
                       plans={plans}
                     />
