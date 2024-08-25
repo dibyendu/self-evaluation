@@ -126,21 +126,28 @@ then
   echo \\$! > /tmp/object_pose.pid
   sleep 4
 fi
-conda activate grasp_SAM
-rosrun perception dibyendu_pose.py
+conda activate object_pose_detection
+rosrun perception object_pose_detection.py
 EOF''')
   ssh.exec_command('chmod +x /tmp/object_pose.sh')
   _, stdout, stderr = ssh.exec_command('/tmp/object_pose.sh')
   stdout, stderr = stdout.readlines(), stderr.readlines()
+  ssh.close()
   if len(stderr) != 0:
     print(''.join(stderr))
-  [fx, fy, _, _] = json.loads(stdout[-1])       # in franka's base
-  [bx, by] = [1.3005 + fy, 0.87035 - fx]        # in baxter's base
-
+    print('------------------------------------------------')
+  output_pattern = '[OUTPUT]'
+  output = list(filter(lambda line: line.startswith(output_pattern), stdout))
+  if len(output) == 0:
+    return jsonify({ 'success': False, 'message': f'no pattern: {output_pattern} found in remote output' })
+  output = json.loads(output[0][len(output_pattern):-1].replace("'", '"'))
   print(''.join(stdout))
-
-  ssh.close()
-  return jsonify({ 'x': bx, 'y': by })
+  if output['success']:
+    [fx, fy, _] = output['location']                     # in franka's base
+    [bx, by] = [1.3005 + fy, 0.87035 - fx]               # in baxter's base
+    return jsonify({ 'success': True, 'x': bx, 'y': by })
+  else:
+    return jsonify({ 'success': False, 'message': output['message'] })
 
 
 if __name__ == '__main__':

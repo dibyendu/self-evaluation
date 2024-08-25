@@ -497,8 +497,13 @@ export default function App() {
                 .then(async response => {
                   if (response.ok) {
                     const permissibleRadius = 8 // cm
-                    const { x, y } = await response.json()
-
+                    const { success, message, x, y } = await response.json()
+                    if (!success) {
+                      setObjectPose(null)
+                      setObjectPoseValid(false)
+                      alert(message)
+                      return
+                    }
                     let elapsed = Date.now() - parseInt(sessionStorage.getItem('start-pose-estimation-time'))
                     elapsed += parseInt(sessionStorage.getItem('pose-estimation-time') ?? '0')
                     sessionStorage.setItem('pose-estimation-time', `${elapsed}`)
