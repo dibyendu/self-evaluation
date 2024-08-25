@@ -1,9 +1,12 @@
+
 # add this line to baxter.sh
 # if [ $# -ne 0 ]; then tf2=$(mktemp); cp $tf $tf2; echo $tf2; fi
 
 import os
 import time
+import json
 import signal
+import paramiko
 import subprocess
 from flask_cors import CORS
 from flask import Flask, jsonify, request, send_from_directory
@@ -99,6 +102,45 @@ def stop(pid):
 
   os.system('rm -f /tmp/%s.pid /tmp/%s.pid %s*' % (pid, pid1, rcfile))
   return jsonify({ 'demonstration': data })
+
+
+@app.route('/pose')
+def pose():
+  ssh = paramiko.SSHClient()
+  ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+  ssh.connect('192.168.1.118', username='marktwo', password='roboticsHE133')
+  ssh.exec_command('''cat > /tmp/object_pose.sh<< EOF
+#!/usr/bin/bash
+$(cat ~/.bashrc)
+launch=false
+if [ ! -f /tmp/object_pose.pid ]
+then
+  launch=true
+elif ! ps -p \\$(cat /tmp/object_pose.pid) > /dev/null
+then
+  launch=true
+fi
+if \\$launch
+then
+  roslaunch realsense2_camera rs_rgbd.launch filters:=pointcloud > /dev/null 2>&1 & disown
+  echo \\$! > /tmp/object_pose.pid
+  sleep 4
+fi
+conda activate grasp_SAM
+rosrun perception dibyendu_pose.py
+EOF''')
+  ssh.exec_command('chmod +x /tmp/object_pose.sh')
+  _, stdout, stderr = ssh.exec_command('/tmp/object_pose.sh')
+  stdout, stderr = stdout.readlines(), stderr.readlines()
+  if len(stderr) != 0:
+    print(''.join(stderr))
+  [fx, fy, _, _] = json.loads(stdout[-1])       # in franka's base
+  [bx, by] = [1.3005 + fy, 0.87035 - fx]        # in baxter's base
+
+  print(''.join(stdout))
+
+  ssh.close()
+  return jsonify({ 'x': bx, 'y': by })
 
 
 if __name__ == '__main__':

@@ -3,7 +3,6 @@ import nj from 'https://esm.run/numjs'
 import JSZip from 'https://esm.run/jszip'
 import FileSaver from 'https://esm.run/file-saver'
 
-import './css/style.css'
 import {
   ε, δ, β,
   backEndHost,
@@ -12,6 +11,7 @@ import {
   demonstrationConfigurationFile,
   demonstrationConfigurationFormat
 } from './Config'
+import './css/style.css'
 import naivePAC from './Bandit'
 import robotImageUrl from './img/robot_top_view.svg'
 
@@ -236,9 +236,8 @@ export default function App() {
 
   const [demonstrationProcessPID, setDemonstrationProcessPID] = useState(null)
 
-  const [userClickPose, setUserClickPose] = useState(null)
-  const [freezeUserClickPose, setFreezeUserClickPose] = useState(false)
-  const [showObjectPoseHint, setShowObjectPoseHint] = useState(true)
+  const [objectPose, setObjectPose] = useState(null)
+  const [isObjectPoseValid, setObjectPoseValid] = useState(false)
 
 
   const loadConfiguration = useCallback(fileMap => {
@@ -302,6 +301,7 @@ export default function App() {
                   )
                 })
                 setDemoConfigAvailable(true)
+                sessionStorage.setItem('start-time', `${Date.now()}`)
               }
             }).catch(error => alert(error))
           )
@@ -312,14 +312,9 @@ export default function App() {
         :
         <>
           <div style={{ display: 'flex', flexDirection: 'row', justifyContent: 'center', alignItems: 'center', position: 'absolute', top: 20 }}>
-            <Switch disabled={isPending} handleToggle={(isActive, callBack) => {
-              if (isPending) return
+            <Switch disabled={isPending || !isObjectPoseValid} handleToggle={(isActive, callBack) => {
+              if (isPending || !isObjectPoseValid) return
               if (!isActive) {
-                if (userClickPose === null) {
-                  alert('Please click inside the workspace to set the object position before collecting the demonstration')
-                  return
-                }
-                setFreezeUserClickPose(true)
                 startAction(() => {
                   const { initial_joint_config } = JSON.parse(sessionStorage.getItem(demonstrationConfigurationFile))
                   return fetch(`${backEndHost}/start`, {
@@ -328,6 +323,7 @@ export default function App() {
                     body: JSON.stringify({ joint_config: initial_joint_config, wait_time: waitTime })
                   })
                   .then(response => {
+                    sessionStorage.setItem('start-demonstration-time', `${Date.now()}`)
                     if (response.ok)
                       return response.json()
                   })
@@ -339,17 +335,16 @@ export default function App() {
                 startAction(() =>
                   fetch(`${backEndHost}/stop/${demonstrationProcessPID}`)
                   .then(response => {
+                    let elapsed = Date.now() - parseInt(sessionStorage.getItem('start-demonstration-time'))
+                    elapsed += parseInt(sessionStorage.getItem('demonstration-time') ?? '0')
+                    sessionStorage.setItem('demonstration-time', `${elapsed}`)
                     if (response.ok)
                       return response.json()
                   })
                   .then(({ demonstration }) => {
-                    setUserClickPose(null)
-                    setShowObjectPoseHint(true)
-                    setFreezeUserClickPose(false)
-
-                    const objectPose = nj.array([
-                      [ 1, 0, 0,  userClickPose.xx    ],
-                      [ 0, 1, 0,  userClickPose.yy    ],
+                    const objectLocation = nj.array([
+                      [ 1, 0, 0,  objectPose.x        ],
+                      [ 0, 1, 0,  objectPose.y        ],
                       [ 0, 0, 1, -0.06447185171756116 ],
                       [ 0, 0, 0,  1                   ],
                     ]).tolist().map(row => row.join(',')).join('\r\n')
@@ -362,17 +357,19 @@ export default function App() {
                     const demoIndices = Object.keys(savedDemonstrations)
                     const index = demoIndices.length === 0 ? 1 : Math.max(...demoIndices) + 1
                     savedDemonstrations[index] = {}
-                    
-                    savedDemonstrations[index]['joint_angle'] = demonstration
-                    savedDemonstrations[index]['object_pose'] = objectPose
+
                     // sphere of radius equals to 1.5 times the minimum distance between object and guiding pose
                     savedDemonstrations[index]['roi'] = 1.5
+                    savedDemonstrations[index]['joint_angle'] = demonstration
+                    savedDemonstrations[index]['object_pose'] = objectLocation
                     savedDemonstrations[index].score = calculate_plan_score(
                       joint_limits,
                       nj.array(demonstration.split('\n').slice(1).map(row => row.split(',').map(cell => parseFloat(cell))))
                     )
 
                     sessionStorage.setItem('demonstrations', JSON.stringify(savedDemonstrations))
+                    setObjectPose(null)
+                    setObjectPoseValid(false)
 
                     const demonstrations = Object.entries(savedDemonstrations).map(([index, demo]) => ({
                       id: parseInt(index),
@@ -469,6 +466,11 @@ export default function App() {
                           }).flat()
                         )
 
+
+                        const [total, total_failed] = Object.entries(metadata).reduce(([total, total_failed], [,{ task_instances, failed_indices }]) => [total + task_instances.length, total_failed + failed_indices.length], [0, 0])
+                        alert(`Overall Success Probability: ${(total - total_failed) * 100 / total}%`)
+
+
                         setProbabilityHeatMap(
                           Object.fromEntries(
                             Object.entries(metadata)
@@ -477,6 +479,7 @@ export default function App() {
                         )
 
                         setProcessing(false)
+                        sessionStorage.setItem('end-time', `${Date.now()}`)
                       }
                     })
                   })
@@ -486,9 +489,38 @@ export default function App() {
               }
             }}/>
             <span>Wait <input type='number' name='tentacles' min={4} max={10} value={waitTime} onChange={e => setWaitTime(Number(e.target.value))} /> seconds</span>
+            <button className={`button ${isPending ? 'disabled' : ''}`} style={{ marginLeft: 20, fontSize: 14, borderRadius: 30 }} onClick={() => {
+              if (isPending) return
+              startAction(() => {
+                sessionStorage.setItem('start-pose-estimation-time', `${Date.now()}`)
+                return fetch(`${backEndHost}/pose`)
+                .then(async response => {
+                  if (response.ok) {
+                    const permissibleRadius = 8 // cm
+                    const { x, y } = await response.json()
+
+                    let elapsed = Date.now() - parseInt(sessionStorage.getItem('start-pose-estimation-time'))
+                    elapsed += parseInt(sessionStorage.getItem('pose-estimation-time') ?? '0')
+                    sessionStorage.setItem('pose-estimation-time', `${elapsed}`)
+
+                    console.log({ x, y })
+                    console.log(nextDemonstrationToRender)
+                    console.log(nextDemonstrationToRender.some(([xn, yn]) => Math.sqrt(Math.abs((xn - x)**2) + Math.abs((yn - y)**2)) * 100 <= permissibleRadius))
+                    
+                    setObjectPose({ x, y })
+                    setObjectPoseValid(
+                      (workSpaceConfig.x.max >= x && x >= workSpaceConfig.x.min && workSpaceConfig.y.max >= y && y >= workSpaceConfig.y.min) &&
+                      (nextDemonstrationToRender.length === 0 || nextDemonstrationToRender.some(([xn, yn]) => Math.sqrt(Math.abs((xn - x)**2) + Math.abs((yn - y)**2)) * 100 <= permissibleRadius))
+                    )
+                  }
+                }).catch(error => alert(error))
+              })
+            }}>
+              Detect Object Pose
+            </button>
           </div>
           <>
-            {!demonstrationAvailable ? <h3>Robot's Workspace</h3> : <h3>Robot's Belief</h3>}
+            {!demonstrationAvailable ? <h3>Robot's Workarea</h3> : <h3>Robot's Belief</h3>}
             <div style={{ display: 'flex', flexDirection: 'column', margin: '0 auto', justifyContent: 'center', alignItems: 'center', position: 'relative' }}>
               <img
                 src={robotImageUrl}
@@ -500,161 +532,154 @@ export default function App() {
                   right: - robotImageDimensions.width / 2 - workSpaceConfig.y.min * workSpaceTheme.scale
                 }}
               />
-              {
-                Array(workSpaceConfig.x.n_segments).fill().map((_, row) => {
-                  const cellWidth = (workSpaceConfig.y.max - workSpaceConfig.y.min) * workSpaceTheme.scale / workSpaceConfig.y.n_segments,
-                        cellHeight = (workSpaceConfig.x.max - workSpaceConfig.x.min) * workSpaceTheme.scale / workSpaceConfig.x.n_segments
-                  return (
-                    <div key={row} style={{ width: cellWidth * workSpaceConfig.y.n_segments, height: cellHeight, display: 'flex', flexDirection: 'row' }}>
-                      {
-                        Array(workSpaceConfig.y.n_segments).fill().map((_, column) => {
-                          const probability = probabilityHeatMap[workSpaceConfig.x.n_segments * workSpaceConfig.y.n_segments - row * workSpaceConfig.x.n_segments - column]
-                          return  (
-                            <div
-                              ref={row === 0 && column === 0 ? firstCellRef : null}
-                              key={column}
-                              style={Object.assign(
-                                {
-                                  width: cellWidth,
-                                  height: cellHeight,
-                                  borderRight: `${workSpaceTheme.border.width}px solid ${workSpaceTheme.border.color}`,
-                                  borderBottom: `${workSpaceTheme.border.width}px solid ${workSpaceTheme.border.color}`,
-                                  backgroundColor: `rgba(${workSpaceTheme.heatmapColor.red}, ${workSpaceTheme.heatmapColor.green}, ${workSpaceTheme.heatmapColor.blue}, ${probability ?? 0})`
-                                },
-                                row === 0 ? { borderTop: `${workSpaceTheme.border.width}px solid ${workSpaceTheme.border.color}` } : {},
-                                column === 0 ? { borderLeft: `${workSpaceTheme.border.width}px solid ${workSpaceTheme.border.color}` } : {}
-                              )}
-                              onClick={event => {
-                                if (freezeUserClickPose) return
-                                const offsets = firstCellRef.current.getBoundingClientRect(),
-                                      x = event.pageX - offsets.left,
-                                      y = event.pageY - offsets.top
-                                if (x >=0 && y >= 0 && x <= workSpaceConfig.x.n_segments * cellWidth && y <= workSpaceConfig.y.n_segments * cellHeight) {
-                                  const xx = workSpaceConfig.x.min + (workSpaceConfig.y.n_segments * cellHeight - y) * (workSpaceConfig.x.max - workSpaceConfig.x.min) / (workSpaceConfig.y.n_segments * cellHeight)
-                                  const yy = workSpaceConfig.y.min + (workSpaceConfig.x.n_segments * cellWidth - x) * (workSpaceConfig.y.max - workSpaceConfig.y.min) / (workSpaceConfig.x.n_segments * cellWidth)
-                                  setUserClickPose({ x, y, xx, yy })
-                                }
-                              }}
-                            />                            
-                          )
-                        }) 
-                      }
-                    </div>
-                  )
-                })
-              }
-              {
-                taskInstancesToRender.map(([x, y, z, { plans, failed, score }], index) => {
-                  const isNextDemo = nextDemonstrationToRender.some(([xn, yn]) => Math.abs(xn - x) < 1e-8  && Math.abs(yn - y) < 1e-8)
-                  return (
-                    <PlanInfo
-                      key={index}
-                      style={Object.assign({
-                        cursor: 'pointer',
-                        position: 'absolute',
-                        opacity: isNextDemo ? 1 : 0.8,
-                        backgroundColor: isNextDemo ? workSpaceTheme.taskInstance.hint : (failed ? workSpaceTheme.taskInstance.failure : workSpaceTheme.taskInstance.success),
-                        width: workSpaceTheme.taskInstance.size,
-                        height: workSpaceTheme.taskInstance.size,
-                        borderRadius: workSpaceTheme.taskInstance.size / 2,
-                        top: (workSpaceConfig.x.max - x) * workSpaceTheme.scale - workSpaceTheme.taskInstance.size / 2,
-                        left: (workSpaceConfig.y.max - y) * workSpaceTheme.scale - workSpaceTheme.taskInstance.size / 2
-                      }, isNextDemo ? { zIndex: 1, boxShadow: `0 0 20px 20px ${workSpaceTheme.taskInstance.hint}66` } : {})}
-                      position={[x, y, z]}
-                      plans={plans}
-                    />
-                  )
-                })
-              }
-              {
-                demonstrationsToRender.map(([x, y, z, { id, score, joint_angles }], index) =>
-                  <span
-                    key={index}
-                    title={`Score: ${score}`}
-                    style={{
-                      position: 'absolute',
-                      cursor: 'pointer',
-                      textAlign: 'center',
-                      opacity: 0.8,
-                      color: workSpaceTheme.demonstration.textColor,
-                      fontSize: workSpaceTheme.demonstration.size,
-                      lineHeight: `${workSpaceTheme.demonstration.size}px`,
-                      width: workSpaceTheme.demonstration.size, height: workSpaceTheme.demonstration.size,
-                      borderRadius: workSpaceTheme.demonstration.size / 2,
-                      backgroundColor: workSpaceTheme.demonstration.color,
-                      top: (workSpaceConfig.x.max - x) * workSpaceTheme.scale - workSpaceTheme.demonstration.size / 2,
-                      left: (workSpaceConfig.y.max - y) * workSpaceTheme.scale - workSpaceTheme.demonstration.size / 2
-                    }}
-                    onClick={() => {
-                      joint_angles = nj.array(joint_angles)
-                      const state = { plan: joint_angles.slice(null, [1,8]).tolist(), timestamps: joint_angles.slice(null, [0,1]).tolist().flat(), position: [x, y, z] }                        
-                      localStorage.setItem('navigation_state', JSON.stringify(state))
-                      window.open('/visualise', '_blank', 'noreferrer')
-                    }}
-                  >
-                    {id}
-                  </span>
+              {Array(workSpaceConfig.x.n_segments).fill().map((_, row) => {
+                const cellWidth = (workSpaceConfig.y.max - workSpaceConfig.y.min) * workSpaceTheme.scale / workSpaceConfig.y.n_segments,
+                      cellHeight = (workSpaceConfig.x.max - workSpaceConfig.x.min) * workSpaceTheme.scale / workSpaceConfig.x.n_segments
+                return (
+                  <div key={row} style={{ width: cellWidth * workSpaceConfig.y.n_segments, height: cellHeight, display: 'flex', flexDirection: 'row' }}>
+                    {
+                      Array(workSpaceConfig.y.n_segments).fill().map((_, column) => {
+                        const probability = probabilityHeatMap[workSpaceConfig.x.n_segments * workSpaceConfig.y.n_segments - row * workSpaceConfig.x.n_segments - column]
+                        return  (
+                          <div
+                            ref={row === 0 && column === 0 ? firstCellRef : null}
+                            key={column}
+                            style={Object.assign(
+                              {
+                                width: cellWidth,
+                                height: cellHeight,
+                                borderRight: `${workSpaceTheme.border.width}px solid ${workSpaceTheme.border.color}`,
+                                borderBottom: `${workSpaceTheme.border.width}px solid ${workSpaceTheme.border.color}`,
+                                backgroundColor: `rgba(${workSpaceTheme.heatmapColor.red}, ${workSpaceTheme.heatmapColor.green}, ${workSpaceTheme.heatmapColor.blue}, ${probability ?? 0})`
+                              },
+                              row === 0 ? { borderTop: `${workSpaceTheme.border.width}px solid ${workSpaceTheme.border.color}` } : {},
+                              column === 0 ? { borderLeft: `${workSpaceTheme.border.width}px solid ${workSpaceTheme.border.color}` } : {}
+                            )}
+                          />                            
+                        )
+                      }) 
+                    }
+                  </div>
                 )
-              }
-              { showObjectPoseHint && userClickPose !== null && (
+              })}
+              {taskInstancesToRender.map(([x, y, z, { plans, failed, score }], index) => {
+                const isNextDemo = nextDemonstrationToRender.some(([xn, yn]) => Math.abs(xn - x) < 1e-8  && Math.abs(yn - y) < 1e-8)
+                return (
+                  <PlanInfo
+                    key={index}
+                    style={Object.assign({
+                      cursor: 'pointer',
+                      position: 'absolute',
+                      opacity: isNextDemo ? 1 : 0.6,
+                      backgroundColor: isNextDemo ? workSpaceTheme.taskInstance.hint : (failed ? workSpaceTheme.taskInstance.failure : workSpaceTheme.taskInstance.success),
+                      width: workSpaceTheme.taskInstance.size,
+                      height: workSpaceTheme.taskInstance.size,
+                      borderRadius: workSpaceTheme.taskInstance.size / 2,
+                      top: (workSpaceConfig.x.max - x) * workSpaceTheme.scale - workSpaceTheme.taskInstance.size / 2,
+                      left: (workSpaceConfig.y.max - y) * workSpaceTheme.scale - workSpaceTheme.taskInstance.size / 2
+                    }, isNextDemo ? { zIndex: 1, boxShadow: `0 0 30px 30px ${workSpaceTheme.taskInstance.hint}66` } : {})}
+                    position={[x, y, z]}
+                    plans={plans}
+                  />
+                )
+              })}
+              {demonstrationsToRender.map(([x, y, z, { id, score, joint_angles }], index) =>
+                <span
+                  key={index}
+                  title={`Score: ${score}`}
+                  style={{
+                    position: 'absolute',
+                    cursor: 'pointer',
+                    textAlign: 'center',
+                    opacity: 0.8,
+                    color: workSpaceTheme.demonstration.textColor,
+                    fontSize: workSpaceTheme.demonstration.size,
+                    lineHeight: `${workSpaceTheme.demonstration.size}px`,
+                    width: workSpaceTheme.demonstration.size,
+                    height: workSpaceTheme.demonstration.size,
+                    borderRadius: workSpaceTheme.demonstration.size / 2,
+                    backgroundColor: workSpaceTheme.demonstration.color,
+                    top: (workSpaceConfig.x.max - x) * workSpaceTheme.scale - workSpaceTheme.demonstration.size / 2,
+                    left: (workSpaceConfig.y.max - y) * workSpaceTheme.scale - workSpaceTheme.demonstration.size / 2
+                  }}
+                  onClick={() => {
+                    joint_angles = nj.array(joint_angles)
+                    const state = { plan: joint_angles.slice(null, [1,8]).tolist(), timestamps: joint_angles.slice(null, [0,1]).tolist().flat(), position: [x, y, z] }                        
+                    localStorage.setItem('navigation_state', JSON.stringify(state))
+                    window.open('/visualise', '_blank', 'noreferrer')
+                  }}
+                >
+                  {id}
+                </span>
+              )}
+              {objectPose !== null && (
                 <span
                   style={{
                     position: 'absolute',
                     opacity: 0.4,
-                    width: workSpaceTheme.demonstration.size * 2, height: workSpaceTheme.demonstration.size * 2,
-                    borderRadius: workSpaceTheme.demonstration.size,
-                    backgroundColor: 'black',
-                    top: userClickPose.y - workSpaceTheme.demonstration.size,
-                    left: userClickPose.x - workSpaceTheme.demonstration.size
+                    width: workSpaceTheme.demonstration.size * 1.5,
+                    height: workSpaceTheme.demonstration.size * 1.5,
+                    borderRadius: workSpaceTheme.demonstration.size * 1.5 / 2,
+                    backgroundColor: 'royalblue',
+                    top: (workSpaceConfig.x.max - objectPose.x) * workSpaceTheme.scale - workSpaceTheme.demonstration.size * 1.5 / 2,
+                    left: (workSpaceConfig.y.max - objectPose.y) * workSpaceTheme.scale - workSpaceTheme.demonstration.size * 1.5 / 2
                   }}
                 />
               )}
             </div>
           </>
           <>
-            <div style={{ display: 'flex', flexDirection: 'row', position: 'absolute', top: 20, left: 20 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', position: 'absolute', top: 20, left: 20 }}>
               {demoConfigAvailable &&  (
                 <>
-                  <label htmlFor='rows' style={{ marginRight: 10 }}>Number of Rows: </label>
-                  <select id='rows' defaultValue={workSpaceConfig.x.n_segments} onChange={({ target: { value }}) => {
-                    setWorkSpaceConfig(config => ({
-                      ...config,
-                      dimensions: config.dimensions.map(d => d.name === 'x' ? { ...d, n_segments: parseInt(value) } : d),
-                      x: { ...config.x, n_segments: parseInt(value) }
-                    }))
-                    setDemonstrationAvailable(false)
-                    setProbabilityHeatMap({})
-                    setTaskInstancesToRender([])
-                    setDemonstrationsToRender([])
-                    setNextDemonstrationToRender([])
-                    sessionStorage.removeItem('demonstrations')
-                  }}>
-                    {
-                      [1,2,3,4,5].map((val, index) =>
-                        <option key={index} value={val}>{val}</option>
-                      )
-                    }
-                  </select>
-                  <label htmlFor='columns' style={{ marginLeft: 20, marginRight: 10 }}>Number of Columns: </label>
-                  <select id='columns' defaultValue={workSpaceConfig.y.n_segments} onChange={({ target: { value }}) => {
-                    setWorkSpaceConfig(config => ({
-                      ...config,
-                      dimensions: config.dimensions.map(d => d.name === 'y' ? { ...d, n_segments: parseInt(value) } : d),
-                      y: { ...config.y, n_segments: parseInt(value) }
-                    }))
-                    setDemonstrationAvailable(false)
-                    setProbabilityHeatMap({})
-                    setTaskInstancesToRender([])
-                    setDemonstrationsToRender([])
-                    setNextDemonstrationToRender([])
-                    sessionStorage.removeItem('demonstrations')
-                  }}>
-                    {
-                      [1,2,3,4,5].map((val, index) =>
-                        <option key={index} value={val}>{val}</option>
-                      )
-                    }
-                  </select>
+                  <div style={{ display: 'flex', flexDirection: 'row', justifyContent: 'space-between' }}>
+                    <label htmlFor='rows' style={{ marginRight: 10 }}>Number of Rows</label>
+                    <select id='rows' defaultValue={workSpaceConfig.x.n_segments} onChange={({ target: { value }}) => {
+                      setWorkSpaceConfig(config => ({
+                        ...config,
+                        dimensions: config.dimensions.map(d => d.name === 'x' ? { ...d, n_segments: parseInt(value) } : d),
+                        x: { ...config.x, n_segments: parseInt(value) }
+                      }))
+                      setDemonstrationAvailable(false)
+                      setObjectPose(null)
+                      setObjectPoseValid(false)
+                      setProbabilityHeatMap({})
+                      setTaskInstancesToRender([])
+                      setDemonstrationsToRender([])
+                      setNextDemonstrationToRender([])
+                      sessionStorage.removeItem('demonstrations')
+                    }}>
+                      {
+                        [1,2,3,4,5].map((val, index) =>
+                          <option key={index} value={val}>{val}</option>
+                        )
+                      }
+                    </select>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'row', justifyContent: 'space-between' }}>
+                    <label htmlFor='columns' style={{ marginRight: 10 }}>Number of Columns</label>
+                    <select id='columns' defaultValue={workSpaceConfig.y.n_segments} onChange={({ target: { value }}) => {
+                      setWorkSpaceConfig(config => ({
+                        ...config,
+                        dimensions: config.dimensions.map(d => d.name === 'y' ? { ...d, n_segments: parseInt(value) } : d),
+                        y: { ...config.y, n_segments: parseInt(value) }
+                      }))
+                      setDemonstrationAvailable(false)
+                      setObjectPose(null)
+                      setObjectPoseValid(false)
+                      setProbabilityHeatMap({})
+                      setTaskInstancesToRender([])
+                      setDemonstrationsToRender([])
+                      setNextDemonstrationToRender([])
+                      sessionStorage.removeItem('demonstrations')
+                    }}>
+                      {
+                        [1,2,3,4,5].map((val, index) =>
+                          <option key={index} value={val}>{val}</option>
+                        )
+                      }
+                    </select>
+                  </div>
                 </>
               )}
             </div>
@@ -670,6 +695,8 @@ export default function App() {
                     <span className='material-symbols-rounded' title='Reset saved demonstrations' style={{ cursor: 'pointer', fontSize: 40 }} onClick={() => {
                       sessionStorage.removeItem('demonstrations')
                       setDemonstrationAvailable(false)
+                      setObjectPose(null)
+                      setObjectPoseValid(false)
                       setProbabilityHeatMap({})
                       setTaskInstancesToRender([])
                       setDemonstrationsToRender([])
@@ -689,6 +716,8 @@ export default function App() {
                     setRobotConfigAvailable(false)
                     setDemoConfigAvailable(false)
                     setDemonstrationAvailable(false)
+                    setObjectPose(null)
+                    setObjectPoseValid(false)
                     setProbabilityHeatMap({})
                     setTaskInstancesToRender([])
                     setDemonstrationsToRender([])
