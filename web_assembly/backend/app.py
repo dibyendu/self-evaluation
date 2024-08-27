@@ -1,4 +1,3 @@
-
 # add this line to baxter.sh
 # if [ $# -ne 0 ]; then tf2=$(mktemp); cp $tf $tf2; echo $tf2; fi
 
@@ -109,28 +108,28 @@ def pose():
   ssh = paramiko.SSHClient()
   ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
   ssh.connect('192.168.1.118', username='marktwo', password='roboticsHE133')
-  ssh.exec_command('''cat > /tmp/object_pose.sh<< EOF
+  ssh.exec_command('''cat > /tmp/object_pose_detection.sh<< EOF
 #!/usr/bin/bash
 $(cat ~/.bashrc)
 launch=false
-if [ ! -f /tmp/object_pose.pid ]
+if [ ! -f /tmp/object_pose_detection.pid ]
 then
   launch=true
-elif ! ps -p \\$(cat /tmp/object_pose.pid) > /dev/null
+elif ! ps -p \\$(cat /tmp/object_pose_detection.pid) > /dev/null
 then
   launch=true
 fi
 if \\$launch
 then
   roslaunch realsense2_camera rs_rgbd.launch filters:=pointcloud > /dev/null 2>&1 & disown
-  echo \\$! > /tmp/object_pose.pid
+  echo \\$! > /tmp/object_pose_detection.pid
   sleep 4
 fi
 conda activate object_pose_detection
 rosrun perception object_pose_detection.py
 EOF''')
-  ssh.exec_command('chmod +x /tmp/object_pose.sh')
-  _, stdout, stderr = ssh.exec_command('/tmp/object_pose.sh')
+  ssh.exec_command('chmod +x /tmp/object_pose_detection.sh')
+  _, stdout, stderr = ssh.exec_command('/tmp/object_pose_detection.sh')
   stdout, stderr = stdout.readlines(), stderr.readlines()
   ssh.close()
   if len(stderr) != 0:

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState, useRef } from 'react'
+import toast, { Toaster } from 'react-hot-toast'
 import nj from 'https://esm.run/numjs'
 import JSZip from 'https://esm.run/jszip'
 import FileSaver from 'https://esm.run/file-saver'
@@ -33,6 +34,8 @@ const defaultWorkSpaceTheme = {
 }
 
 const robotImageWidth = 400
+
+const permissibleRadius = 5 // cm
 
 
 function calculate_plan_score(joint_limits, joint_angles) {
@@ -210,9 +213,17 @@ function Switch({ disabled, handleToggle }) {
 }
 
 
+function calculateTimeElapsed(key) {
+  let elapsed = Date.now() - parseInt(sessionStorage.getItem(`start-${key}`))
+  elapsed += parseInt(sessionStorage.getItem(key) ?? '0')
+  sessionStorage.setItem(key, `${elapsed}`)
+}
+
+
 export default function App() {
 
   const firstCellRef = useRef(null)
+  const draggableRef = useRef(null)
 
   const [demoConfigAvailable, setDemoConfigAvailable] = useState(false)
   const [robotConfigAvailable, setRobotConfigAvailable] = useState(false)
@@ -238,6 +249,9 @@ export default function App() {
 
   const [objectPose, setObjectPose] = useState(null)
   const [isObjectPoseValid, setObjectPoseValid] = useState(false)
+  const [objectPoseDetected, setObjectPoseDetected] = useState(false)
+
+  const [visualAssistanceEnabled, setVisualAssistanceEnabled] = useState(true)
 
 
   const loadConfiguration = useCallback(fileMap => {
@@ -275,6 +289,45 @@ export default function App() {
     setDemoConfigAvailable(config !== null)
     setDemonstrationAvailable(sessionStorage.getItem('demonstrations') !== null)
   }, [])
+
+
+  useEffect(() => {
+    if (objectPoseDetected && draggableRef.current) {
+      let currentTop = 0, currentLeft = 0
+      const { top: workAreaTop, left: workArealeft } = firstCellRef.current.getBoundingClientRect()
+      
+      draggableRef.current.onmousedown = dragStart
+
+      function dragStart(e) {
+        e.preventDefault()
+        currentTop = e.clientY - workAreaTop - workSpaceTheme.demonstration.size * 1.5 / 2
+        currentLeft = e.clientX - workArealeft - workSpaceTheme.demonstration.size * 1.5 / 2
+        document.onmouseup = dragEnd
+        document.onmousemove = dragging
+      }
+
+      function dragging(e) {
+        e.preventDefault()
+        currentTop = e.clientY - workAreaTop - workSpaceTheme.demonstration.size * 1.5 / 2
+        currentLeft = e.clientX - workArealeft - workSpaceTheme.demonstration.size * 1.5 / 2
+        draggableRef.current.style.top = `${currentTop}px`
+        draggableRef.current.style.left = `${currentLeft}px`
+      }
+
+      function dragEnd() {
+        document.onmouseup = null
+        document.onmousemove = null
+        const x = workSpaceConfig.x.max - (currentTop + workSpaceTheme.demonstration.size * 1.5 / 2) / workSpaceTheme.scale,
+              y = workSpaceConfig.y.max - (currentLeft + workSpaceTheme.demonstration.size * 1.5 / 2) / workSpaceTheme.scale
+        setObjectPose({ x, y })
+        setObjectPoseValid(
+          (workSpaceConfig.x.max >= x && x >= workSpaceConfig.x.min && workSpaceConfig.y.max >= y && y >= workSpaceConfig.y.min) &&
+          (nextDemonstrationToRender.length === 0 || nextDemonstrationToRender.some(([xn, yn]) => Math.sqrt(Math.abs((xn - x)**2) + Math.abs((yn - y)**2)) * 100 <= permissibleRadius))
+        )
+      }
+    }
+  }, [objectPoseDetected, nextDemonstrationToRender])
+
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', height: '100%', position: 'fixed', width: '100%' }}>
@@ -315,6 +368,7 @@ export default function App() {
             <Switch disabled={isPending || !isObjectPoseValid} handleToggle={(isActive, callBack) => {
               if (isPending || !isObjectPoseValid) return
               if (!isActive) {
+                sessionStorage.setItem('start-demonstration-preparation-time', `${Date.now()}`)
                 startAction(() => {
                   const { initial_joint_config } = JSON.parse(sessionStorage.getItem(demonstrationConfigurationFile))
                   return fetch(`${backEndHost}/start`, {
@@ -323,25 +377,29 @@ export default function App() {
                     body: JSON.stringify({ joint_config: initial_joint_config, wait_time: waitTime })
                   })
                   .then(response => {
-                    sessionStorage.setItem('start-demonstration-time', `${Date.now()}`)
+                    calculateTimeElapsed('demonstration-preparation-time')
                     if (response.ok)
                       return response.json()
                   })
-                  .then(({ pid }) => setDemonstrationProcessPID(pid))
+                  .then(({ pid }) => {
+                    sessionStorage.setItem('start-demonstration-acquisition-time', `${Date.now()}`)
+                    setDemonstrationProcessPID(pid)
+                  })
                   .catch(error => alert(error))
                   .finally(() => callBack())
                 })
               } else {
+                calculateTimeElapsed('demonstration-acquisition-time')
+                sessionStorage.setItem('start-demonstration-preparation-time', `${Date.now()}`)
                 startAction(() =>
                   fetch(`${backEndHost}/stop/${demonstrationProcessPID}`)
                   .then(response => {
-                    let elapsed = Date.now() - parseInt(sessionStorage.getItem('start-demonstration-time'))
-                    elapsed += parseInt(sessionStorage.getItem('demonstration-time') ?? '0')
-                    sessionStorage.setItem('demonstration-time', `${elapsed}`)
+                    calculateTimeElapsed('demonstration-preparation-time')
                     if (response.ok)
                       return response.json()
                   })
                   .then(({ demonstration }) => {
+                    sessionStorage.setItem('start-simulation-time', `${Date.now()}`)
                     const objectLocation = nj.array([
                       [ 1, 0, 0,  objectPose.x        ],
                       [ 0, 1, 0,  objectPose.y        ],
@@ -370,6 +428,7 @@ export default function App() {
                     sessionStorage.setItem('demonstrations', JSON.stringify(savedDemonstrations))
                     setObjectPose(null)
                     setObjectPoseValid(false)
+                    setObjectPoseDetected(false)
 
                     const demonstrations = Object.entries(savedDemonstrations).map(([index, demo]) => ({
                       id: parseInt(index),
@@ -420,7 +479,7 @@ export default function App() {
                         return (x_min <= x) && (x <= x_max) && (y_min <= y) && (y <= y_max)
                       })
                       if (arm === undefined) {
-                        alert(`Object pose used in demonstration #${index + 1} is outside the workspace`)
+                        toast(`Object pose used in demonstration #${index + 1} is outside the workspace`)
                         return
                       }
                       renderPoints.push([x, y, z, {
@@ -448,38 +507,48 @@ export default function App() {
                       epsilon: ε,
                       delta: δ,
                       onFinishCallback: ({ metadata, worst_arm_index, worst_arm_failure_probability, next_demonstration }) => {
+                        calculateTimeElapsed('simulation-time')
                         setDemonstrationAvailable(true)
-                        if (next_demonstration !== null)
-                          setNextDemonstrationToRender(next_demonstration)
 
-                        if (worst_arm_failure_probability < 1 + ε - β)
-                          alert('No more demonstration is required')
+                        if (visualAssistanceEnabled) {
+                          if (next_demonstration !== null)
+                            setNextDemonstrationToRender(next_demonstration)
 
-                        setTaskInstancesToRender(
-                          Object.values(metadata).map(({ task_instances, failed_indices, failure_scores, plans }) => {
-                            task_instances = task_instances.map(([[x, y, z]], index) => [x, y, z, { plans: plans[index], failed: false }])
-                            failed_indices.forEach((index, i) => {
-                              task_instances[index].at(-1).failed = true
-                              task_instances[index].at(-1).score = failure_scores[i]
-                            })
-                            return task_instances
-                          }).flat()
-                        )
-
-
-                        const [total, total_failed] = Object.entries(metadata).reduce(([total, total_failed], [,{ task_instances, failed_indices }]) => [total + task_instances.length, total_failed + failed_indices.length], [0, 0])
-                        alert(`Overall Success Probability: ${(total - total_failed) * 100 / total}%`)
-
-
-                        setProbabilityHeatMap(
-                          Object.fromEntries(
-                            Object.entries(metadata)
-                            .map(([arm_id, { task_instances, failed_indices }]) => [arm_id, failed_indices.length / task_instances.length ])
+                          setTaskInstancesToRender(
+                            Object.values(metadata).map(({ task_instances, failed_indices, failure_scores, plans }) => {
+                              task_instances = task_instances.map(([[x, y, z]], index) => [x, y, z, { plans: plans[index], failed: false }])
+                              failed_indices.forEach((index, i) => {
+                                task_instances[index].at(-1).failed = true
+                                task_instances[index].at(-1).score = failure_scores[i]
+                              })
+                              return task_instances
+                            }).flat()
                           )
-                        )
+
+                          setProbabilityHeatMap(
+                            Object.fromEntries(
+                              Object.entries(metadata)
+                              .map(([arm_id, { task_instances, failed_indices }]) => [arm_id, failed_indices.length / task_instances.length ])
+                            )
+                          )
+                        }
 
                         setProcessing(false)
+
+
+
+
+                        if (!visualAssistanceEnabled) {
+                          const [total, total_failed] = Object.entries(metadata).reduce(([total, total_failed], [,{ task_instances, failed_indices }]) => [total + task_instances.length, total_failed + failed_indices.length], [0, 0])
+                          toast(`Overall Success Probability: ${Math.round((total - total_failed) * 10000 / total) / 100}%`, { duration: 8000, style: { color: 'white', background: 'black' }})
+                        }
+
+
+
+
                         sessionStorage.setItem('end-time', `${Date.now()}`)
+                        if (worst_arm_failure_probability < 1 + ε - β)
+                          alert('No more demonstration is required')                        
                       }
                     })
                   })
@@ -491,37 +560,29 @@ export default function App() {
             <span>Wait <input type='number' name='tentacles' min={4} max={10} value={waitTime} onChange={e => setWaitTime(Number(e.target.value))} /> seconds</span>
             <button className={`button ${isPending ? 'disabled' : ''}`} style={{ marginLeft: 20, fontSize: 14, borderRadius: 30 }} onClick={() => {
               if (isPending) return
-              startAction(() => {
-                sessionStorage.setItem('start-pose-estimation-time', `${Date.now()}`)
-                return fetch(`${backEndHost}/pose`)
+              sessionStorage.setItem('start-pose-estimation-time', `${Date.now()}`)
+              startAction(() =>
+                fetch(`${backEndHost}/pose`)
                 .then(async response => {
                   if (response.ok) {
-                    const permissibleRadius = 8 // cm
-                    const { success, message, x, y } = await response.json()
+                    calculateTimeElapsed('pose-estimation-time')
+                    let { success, message, x, y } = await response.json()
                     if (!success) {
-                      setObjectPose(null)
-                      setObjectPoseValid(false)
-                      alert(message)
-                      return
+                      x = workSpaceConfig.x.max + 0.01
+                      y = workSpaceConfig.y.min - 0.01
+                      toast.error(message, { style: { borderRadius: 10, background: '#333', color: '#fff' }})
                     }
-                    let elapsed = Date.now() - parseInt(sessionStorage.getItem('start-pose-estimation-time'))
-                    elapsed += parseInt(sessionStorage.getItem('pose-estimation-time') ?? '0')
-                    sessionStorage.setItem('pose-estimation-time', `${elapsed}`)
-
-                    console.log({ x, y })
-                    console.log(nextDemonstrationToRender)
-                    console.log(nextDemonstrationToRender.some(([xn, yn]) => Math.sqrt(Math.abs((xn - x)**2) + Math.abs((yn - y)**2)) * 100 <= permissibleRadius))
-                    
                     setObjectPose({ x, y })
+                    setObjectPoseDetected(true)
                     setObjectPoseValid(
                       (workSpaceConfig.x.max >= x && x >= workSpaceConfig.x.min && workSpaceConfig.y.max >= y && y >= workSpaceConfig.y.min) &&
                       (nextDemonstrationToRender.length === 0 || nextDemonstrationToRender.some(([xn, yn]) => Math.sqrt(Math.abs((xn - x)**2) + Math.abs((yn - y)**2)) * 100 <= permissibleRadius))
                     )
                   }
                 }).catch(error => alert(error))
-              })
+              )
             }}>
-              Detect Object Pose
+              {isPending ? <div className='loader'></div> : 'Detect Object Pose'}
             </button>
           </div>
           <>
@@ -582,7 +643,7 @@ export default function App() {
                       borderRadius: workSpaceTheme.taskInstance.size / 2,
                       top: (workSpaceConfig.x.max - x) * workSpaceTheme.scale - workSpaceTheme.taskInstance.size / 2,
                       left: (workSpaceConfig.y.max - y) * workSpaceTheme.scale - workSpaceTheme.taskInstance.size / 2
-                    }, isNextDemo ? { zIndex: 1, boxShadow: `0 0 30px 30px ${workSpaceTheme.taskInstance.hint}66` } : {})}
+                    }, isNextDemo ? { zIndex: 1, boxShadow: `0 0 50px 50px ${workSpaceTheme.taskInstance.hint}66` } : {})}
                     position={[x, y, z]}
                     plans={plans}
                   />
@@ -593,10 +654,10 @@ export default function App() {
                   key={index}
                   title={`Score: ${score}`}
                   style={{
-                    position: 'absolute',
+                    opacity: 0.8,
                     cursor: 'pointer',
                     textAlign: 'center',
-                    opacity: 0.8,
+                    position: 'absolute',
                     color: workSpaceTheme.demonstration.textColor,
                     fontSize: workSpaceTheme.demonstration.size,
                     lineHeight: `${workSpaceTheme.demonstration.size}px`,
@@ -619,13 +680,17 @@ export default function App() {
               )}
               {objectPose !== null && (
                 <span
+                  ref={draggableRef}
                   style={{
+                    zIndex: 1,
+                    opacity: 0.6,
+                    cursor: 'move',
                     position: 'absolute',
-                    opacity: 0.4,
+                    border: '2px solid white',
+                    backgroundColor: 'royalblue',
                     width: workSpaceTheme.demonstration.size * 1.5,
                     height: workSpaceTheme.demonstration.size * 1.5,
-                    borderRadius: workSpaceTheme.demonstration.size * 1.5 / 2,
-                    backgroundColor: 'royalblue',
+                    borderRadius: workSpaceTheme.demonstration.size * 1.5 / 2 + 2,
                     top: (workSpaceConfig.x.max - objectPose.x) * workSpaceTheme.scale - workSpaceTheme.demonstration.size * 1.5 / 2,
                     left: (workSpaceConfig.y.max - objectPose.y) * workSpaceTheme.scale - workSpaceTheme.demonstration.size * 1.5 / 2
                   }}
@@ -647,6 +712,7 @@ export default function App() {
                       }))
                       setDemonstrationAvailable(false)
                       setObjectPose(null)
+                      setObjectPoseDetected(false)
                       setObjectPoseValid(false)
                       setProbabilityHeatMap({})
                       setTaskInstancesToRender([])
@@ -671,6 +737,7 @@ export default function App() {
                       }))
                       setDemonstrationAvailable(false)
                       setObjectPose(null)
+                      setObjectPoseDetected(false)
                       setObjectPoseValid(false)
                       setProbabilityHeatMap({})
                       setTaskInstancesToRender([])
@@ -701,6 +768,7 @@ export default function App() {
                       sessionStorage.removeItem('demonstrations')
                       setDemonstrationAvailable(false)
                       setObjectPose(null)
+                      setObjectPoseDetected(false)
                       setObjectPoseValid(false)
                       setProbabilityHeatMap({})
                       setTaskInstancesToRender([])
@@ -722,6 +790,7 @@ export default function App() {
                     setDemoConfigAvailable(false)
                     setDemonstrationAvailable(false)
                     setObjectPose(null)
+                    setObjectPoseDetected(false)
                     setObjectPoseValid(false)
                     setProbabilityHeatMap({})
                     setTaskInstancesToRender([])
@@ -733,10 +802,29 @@ export default function App() {
                   </span>
                 </div>
               )}
+              <div style={{ position: 'relative' }}>
+                <span className='material-symbols-outlined' title='Display Time Information' style={{ cursor: 'pointer', fontSize: 40 }} onClick={() =>
+                  console.table({
+                    'Total Time': { 'Time (ms)': parseInt(sessionStorage.getItem('end-time')) - parseInt(sessionStorage.getItem('start-time')) },
+                    'Pose Detection Time': { 'Time (ms)': parseInt(sessionStorage.getItem('pose-estimation-time')) },
+                    'Demonstration Preparation Time': { 'Time (ms)': parseInt(sessionStorage.getItem('demonstration-preparation-time')) },
+                    'Demonstration Acquisition Time': { 'Time (ms)': parseInt(sessionStorage.getItem('demonstration-acquisition-time')), Human: '✓' },
+                    'Simulation Time': { 'Time (ms)': parseInt(sessionStorage.getItem('simulation-time')) }
+                  })
+                }>
+                  timer
+                </span>
+              </div>
+              <div style={{ position: 'relative' }}>
+                <span className='material-symbols-outlined' title={visualAssistanceEnabled ? 'Disable Visual Assistance' : 'Enable Visual Assistance'} style={{ cursor: 'pointer', fontSize: 40 }} onClick={() => setVisualAssistanceEnabled(enabled => !enabled)}>
+                  {visualAssistanceEnabled ? 'visibility' : 'visibility_off'}
+                </span>
+              </div>
             </div>
           </>
         </>
       }
+      <Toaster position='bottom-center' toastOptions={{ duration: 4000 }} />
     </div>
   )
 }
