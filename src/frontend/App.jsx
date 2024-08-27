@@ -805,11 +805,11 @@ export default function App() {
               <div style={{ position: 'relative' }}>
                 <span className='material-symbols-outlined' title='Display Time Information' style={{ cursor: 'pointer', fontSize: 40 }} onClick={() =>
                   console.table({
-                    'Total Time': { 'Time (ms)': parseInt(sessionStorage.getItem('end-time')) - parseInt(sessionStorage.getItem('start-time')) },
-                    'Pose Detection Time': { 'Time (ms)': parseInt(sessionStorage.getItem('pose-estimation-time')) },
-                    'Demonstration Preparation Time': { 'Time (ms)': parseInt(sessionStorage.getItem('demonstration-preparation-time')) },
-                    'Demonstration Acquisition Time': { 'Time (ms)': parseInt(sessionStorage.getItem('demonstration-acquisition-time')), Human: '✓' },
-                    'Simulation Time': { 'Time (ms)': parseInt(sessionStorage.getItem('simulation-time')) }
+                    '(A) Total Time': { 'Time (ms)': parseInt(sessionStorage.getItem('end-time')) - parseInt(sessionStorage.getItem('start-time')) },
+                    '(B) Pose Detection Time': { 'Time (ms)': parseInt(sessionStorage.getItem('pose-estimation-time')) },
+                    '(C) Demonstration Preparation Time': { 'Time (ms)': parseInt(sessionStorage.getItem('demonstration-preparation-time')) },
+                    '(D) Demonstration Acquisition Time': { 'Time (ms)': parseInt(sessionStorage.getItem('demonstration-acquisition-time')), Human: '✓' },
+                    '(E) Simulation Time': { 'Time (ms)': parseInt(sessionStorage.getItem('simulation-time')) }
                   })
                 }>
                   timer
