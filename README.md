@@ -1,4 +1,4 @@
-[![Open in StackBlitz](https://developer.stackblitz.com/img/open_in_stackblitz_small.svg)](https://stackblitz.com/github/dibyendu/self-evaluation/tree/main/web_assembly)
+[![Open in StackBlitz](https://developer.stackblitz.com/img/open_in_stackblitz_small.svg)](https://stackblitz.com/~/github/dibyendu/self-evaluation/tree/backend)
 
 
 ![belief](https://github.com/user-attachments/assets/77b3ee97-9630-4d39-97b8-f65cd83fdccb)
