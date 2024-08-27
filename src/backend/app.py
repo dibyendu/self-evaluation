@@ -36,12 +36,12 @@ def generate_rcfile():
 
 @app.route('/')
 def index():
-  return send_from_directory('%s/frontend' % frontend_folder, 'index.html')
+  return send_from_directory(frontend_folder, 'index.html')
 
 
 @app.route('/visualise')
 def visualise():
-  return send_from_directory('%s/frontend' % frontend_folder, 'visualise.html')
+  return send_from_directory(frontend_folder, 'visualise.html')
 
 
 @app.route('/assets/<path:filename>')
