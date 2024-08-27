@@ -1,0 +1,33 @@
+name: Deploy Mock Server to Deno Deploy
+
+
+on:
+  push:
+    branches:
+      - backend
+  workflow_dispatch:
+
+
+permissions:
+  contents: read
+  id-token: write
+
+
+jobs:
+  deploy-mock-server:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Git Repository
+        uses: actions/checkout@v4
+
+      - name: Install Deno
+        uses: denoland/setup-deno@v1
+        with:
+          deno-version: v1.45.5
+
+      - name: Deploy to Deno Deploy
+        uses: denoland/deployctl@v1
+        with:
+          project: self-evaluation-mock-server
+          entrypoint: mock_server.js

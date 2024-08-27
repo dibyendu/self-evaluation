@@ -23,29 +23,7 @@ export default defineConfig({
   },
   root: 'src',
   server: {
-    ...serverConfig,
-    proxy: {
-      '/init': {
-        target: 'https://dummyjson.com/c/aa0b-5443-44da-bc28',
-        changeOrigin: true,
-        rewrite: path => path.replace(/^\/init/, '')
-      },
-      '/start': {
-        target: 'https://dummyjson.com/c/fb8b-a9f0-4b34-bd80',
-        changeOrigin: true,
-        rewrite: path => path.replace(/^\/start/, '')
-      },
-      '^/stop/.*': {
-        target: 'https://dummyjson.com/c/0c99-8c1e-4279-800d',
-        changeOrigin: true,
-        rewrite: path => path.replace(/^\/stop\/.*/, ''),
-      },
-      '/pose': {
-        target: 'https://dummyjson.com/c/8bc5-f188-44bd-9c12',
-        changeOrigin: true,
-        rewrite: path => path.replace(/^\/pose/, '')
-      }
-    }
+    ...serverConfig
   },
   preview: {
     ...serverConfig
