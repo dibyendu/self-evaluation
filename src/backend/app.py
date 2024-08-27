@@ -11,7 +11,7 @@ from flask_cors import CORS
 from flask import Flask, jsonify, request, send_from_directory
 
 
-# if changed, make sure to update it in self-evaluation/web_assembly/src/Config.js
+# if changed, make sure to update it in self-evaluation/src/frontend/Config.js
 PORT = 8000
 
 workspace_path = '/home/shubham/baxter_ws'
@@ -19,7 +19,7 @@ workspace_path = '/home/shubham/baxter_ws'
 
 
 
-frontend_folder = os.path.abspath(os.path.realpath(os.path.join(os.path.dirname(os.path.realpath(__file__)), '../frontend')))
+frontend_folder = os.path.abspath(os.path.realpath(os.path.join(os.path.dirname(os.path.realpath(__file__)), '../frontend_compiled')))
 
 env = os.environ.copy()
 
@@ -36,12 +36,12 @@ def generate_rcfile():
 
 @app.route('/')
 def index():
-  return send_from_directory(frontend_folder, 'index.html')
+  return send_from_directory('%s/frontend' % frontend_folder, 'index.html')
 
 
 @app.route('/visualise')
 def visualise():
-  return send_from_directory(frontend_folder, 'visualise.html')
+  return send_from_directory('%s/frontend' % frontend_folder, 'visualise.html')
 
 
 @app.route('/assets/<path:filename>')

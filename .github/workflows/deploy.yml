@@ -29,5 +29,5 @@ jobs:
       - name: Deploy to Deno Deploy
         uses: denoland/deployctl@v1
         with:
-          project: self-evaluation-mock-server
+          project: bandit-mock-server
           entrypoint: mock_server.js

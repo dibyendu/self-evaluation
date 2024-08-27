@@ -10,11 +10,11 @@ const serverConfig = {
 
 export default defineConfig({
   build: {
-    outDir: '../frontend',
+    outDir: 'frontend_compiled',
     rollupOptions: {
       input: [
-        resolve(__dirname, 'src', 'index.html'),
-        resolve(__dirname, 'src', 'visualise.html')
+        resolve(__dirname, 'src/frontend', 'index.html'),
+        resolve(__dirname, 'src/frontend', 'visualise.html')
       ]
     }
   },
