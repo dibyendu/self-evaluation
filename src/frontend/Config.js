@@ -27,5 +27,6 @@ export const demonstrationFiles = {
   roi: 'region_of_interest.txt'
 }
 
+export const backEndHost = 'https://bandit-mock-server.deno.dev'
 
-export const backEndHost = 'http://192.168.1.107:8000'
+// export const backEndHost = 'http://192.168.1.107:8000'
