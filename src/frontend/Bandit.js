@@ -26,9 +26,7 @@ export default function naivePAC({ dimensions, initial_joint_config, n_objects, 
 
         const arm_probabilities = Object.entries(metadata).map(([arm_id, { failed_indices, task_instances }]) => [arm_id, failed_indices.length / task_instances.length]),
               worst_arm_failure_probability = nj.max(arm_probabilities.map(([, probability]) => probability)),
-              worst_arm_indices = arm_probabilities
-                                  .filter(([arm_id, probability]) => probability === worst_arm_failure_probability)
-                                  .map(([arm_id]) => arm_id),
+              worst_arm_indices = arm_probabilities.filter(([arm_id, probability]) => probability === worst_arm_failure_probability).map(([arm_id]) => arm_id),
               worst_arm_index = worst_arm_indices[Math.floor(Math.random() * worst_arm_indices.length)]
 
         const min_score = nj.min(metadata[worst_arm_index].failure_scores) ?? 0
@@ -37,10 +35,13 @@ export default function naivePAC({ dimensions, initial_joint_config, n_objects, 
                                       .map((failed_index, index) => metadata[worst_arm_index].failure_scores[index] === min_score ? failed_index : null)
                                       .filter(index => index !== null)
 
+        const next_demonstrations = []
         for (const id in metadata) {
           let task_instances = nj.array(metadata[id].task_instances)
           task_instances = task_instances.slice(null, null, [3], -1)
           task_instances = task_instances.reshape(task_instances.shape.slice(0, -1))
+          if (worst_arm_indices.includes(id))
+            next_demonstrations.push(nj.divide(metadata[id].failed_indices.reduce((acc, index) => nj.add(acc, task_instances.pick(index)), nj.zeros([1,3])), metadata[id].failed_indices.length).flatten())
           metadata[id].task_instances = task_instances.tolist()
         }
 
@@ -54,7 +55,8 @@ export default function naivePAC({ dimensions, initial_joint_config, n_objects, 
           metadata,
           worst_arm_index,
           worst_arm_failure_probability,
-          next_demonstration
+          next_demonstration,
+          next_demonstrations: nj.stack(next_demonstrations).tolist()
         })
       }
     }

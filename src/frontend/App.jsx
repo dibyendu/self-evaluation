@@ -321,8 +321,12 @@ export default function App() {
               y = workSpaceConfig.y.max - (currentLeft + workSpaceTheme.demonstration.size * 1.5 / 2) / workSpaceTheme.scale
         setObjectPose({ x, y })
         setObjectPoseValid(
-          (workSpaceConfig.x.max >= x && x >= workSpaceConfig.x.min && workSpaceConfig.y.max >= y && y >= workSpaceConfig.y.min) &&
-          (nextDemonstrationToRender.length === 0 || nextDemonstrationToRender.some(([xn, yn]) => Math.sqrt(Math.abs((xn - x)**2) + Math.abs((yn - y)**2)) * 100 <= permissibleRadius))
+          (
+            workSpaceConfig.x.max >= x && x >= workSpaceConfig.x.min && workSpaceConfig.y.max >= y && y >= workSpaceConfig.y.min
+          ) && (
+            nextDemonstrationToRender.length === 0 ||
+            nextDemonstrationToRender.some(([xn, yn]) => Math.sqrt(Math.abs((xn - x)**2) + Math.abs((yn - y)**2)) * 100 <= permissibleRadius)
+          )
         )
       }
     }
@@ -506,13 +510,12 @@ export default function App() {
                       arms: bandit_arms,
                       epsilon: ε,
                       delta: δ,
-                      onFinishCallback: ({ metadata, worst_arm_index, worst_arm_failure_probability, next_demonstration }) => {
+                      onFinishCallback: ({ metadata, worst_arm_index, worst_arm_failure_probability, next_demonstration, next_demonstrations }) => {
                         calculateTimeElapsed('simulation-time')
                         setDemonstrationAvailable(true)
 
                         if (visualAssistanceEnabled) {
-                          if (next_demonstration !== null)
-                            setNextDemonstrationToRender(next_demonstration)
+                          setNextDemonstrationToRender(next_demonstrations)
 
                           setTaskInstancesToRender(
                             Object.values(metadata).map(({ task_instances, failed_indices, failure_scores, plans }) => {
@@ -535,16 +538,10 @@ export default function App() {
 
                         setProcessing(false)
 
-
-
-
                         if (!visualAssistanceEnabled) {
                           const [total, total_failed] = Object.entries(metadata).reduce(([total, total_failed], [,{ task_instances, failed_indices }]) => [total + task_instances.length, total_failed + failed_indices.length], [0, 0])
                           toast(`Overall Success Probability: ${Math.round((total - total_failed) * 10000 / total) / 100}%`, { duration: 8000, style: { color: 'white', background: 'black' }})
                         }
-
-
-
 
                         sessionStorage.setItem('end-time', `${Date.now()}`)
                         if (worst_arm_failure_probability < 1 + ε - β)
@@ -566,18 +563,29 @@ export default function App() {
                 .then(async response => {
                   if (response.ok) {
                     calculateTimeElapsed('pose-estimation-time')
-                    let { success, message, x, y } = await response.json()
+                    let { success, message, x, y, variance } = await response.json()
                     if (!success) {
                       x = workSpaceConfig.x.max + 0.01
                       y = workSpaceConfig.y.min - 0.01
                       toast.error(message, { style: { borderRadius: 10, background: '#333', color: '#fff' }})
                     }
+                    const isValid = (
+                      workSpaceConfig.x.max >= x && x >= workSpaceConfig.x.min && workSpaceConfig.y.max >= y && y >= workSpaceConfig.y.min
+                    ) && (
+                      nextDemonstrationToRender.length === 0 ||
+                      nextDemonstrationToRender.some(([xn, yn]) => Math.sqrt(Math.abs((xn - x)**2) + Math.abs((yn - y)**2)) * 100 <= permissibleRadius)
+                    )
+
+                    if (success) {
+                      if (variance.some(v => v >= 1.0e-4))
+                        toast(`Object pose detection is not quite accurate.\n\nAdjust the blue dot in the interface.`, { duration: 5000, style: { color: 'white', background: 'black' }})
+                      else if (!isValid)
+                        toast(`Object is not within the yellow cloud.\n\nAdjust the object on the table.`, { duration: 5000, style: { color: 'white', background: 'black' }})
+                    }
+
                     setObjectPose({ x, y })
                     setObjectPoseDetected(true)
-                    setObjectPoseValid(
-                      (workSpaceConfig.x.max >= x && x >= workSpaceConfig.x.min && workSpaceConfig.y.max >= y && y >= workSpaceConfig.y.min) &&
-                      (nextDemonstrationToRender.length === 0 || nextDemonstrationToRender.some(([xn, yn]) => Math.sqrt(Math.abs((xn - x)**2) + Math.abs((yn - y)**2)) * 100 <= permissibleRadius))
-                    )
+                    setObjectPoseValid(isValid)
                   }
                 }).catch(error => alert(error))
               )
@@ -628,27 +636,35 @@ export default function App() {
                   </div>
                 )
               })}
-              {taskInstancesToRender.map(([x, y, z, { plans, failed, score }], index) => {
-                const isNextDemo = nextDemonstrationToRender.some(([xn, yn]) => Math.abs(xn - x) < 1e-8  && Math.abs(yn - y) < 1e-8)
-                return (
-                  <PlanInfo
-                    key={index}
-                    style={Object.assign({
-                      cursor: 'pointer',
-                      position: 'absolute',
-                      opacity: isNextDemo ? 1 : 0.6,
-                      backgroundColor: isNextDemo ? workSpaceTheme.taskInstance.hint : (failed ? workSpaceTheme.taskInstance.failure : workSpaceTheme.taskInstance.success),
-                      width: workSpaceTheme.taskInstance.size,
-                      height: workSpaceTheme.taskInstance.size,
-                      borderRadius: workSpaceTheme.taskInstance.size / 2,
-                      top: (workSpaceConfig.x.max - x) * workSpaceTheme.scale - workSpaceTheme.taskInstance.size / 2,
-                      left: (workSpaceConfig.y.max - y) * workSpaceTheme.scale - workSpaceTheme.taskInstance.size / 2
-                    }, isNextDemo ? { zIndex: 1, boxShadow: `0 0 50px 50px ${workSpaceTheme.taskInstance.hint}66` } : {})}
-                    position={[x, y, z]}
-                    plans={plans}
-                  />
-                )
-              })}
+              {taskInstancesToRender.map(([x, y, z, { plans, failed, score }], index) =>
+                <PlanInfo
+                  key={index}
+                  style={{
+                    cursor: 'pointer',
+                    position: 'absolute',
+                    opacity: 0.6,
+                    backgroundColor: failed ? workSpaceTheme.taskInstance.failure : workSpaceTheme.taskInstance.success,
+                    width: workSpaceTheme.taskInstance.size,
+                    height: workSpaceTheme.taskInstance.size,
+                    borderRadius: workSpaceTheme.taskInstance.size / 2,
+                    top: (workSpaceConfig.x.max - x) * workSpaceTheme.scale - workSpaceTheme.taskInstance.size / 2,
+                    left: (workSpaceConfig.y.max - y) * workSpaceTheme.scale - workSpaceTheme.taskInstance.size / 2
+                  }}
+                  position={[x, y, z]}
+                  plans={plans}
+                />
+              )}
+              {nextDemonstrationToRender.map(([x, y], index) =>
+                <span
+                  key={index}
+                  style={{
+                    position: 'absolute',
+                    boxShadow: `0 0 50px 50px ${workSpaceTheme.taskInstance.hint}66`,
+                    top: (workSpaceConfig.x.max - x) * workSpaceTheme.scale - workSpaceTheme.taskInstance.size / 2,
+                    left: (workSpaceConfig.y.max - y) * workSpaceTheme.scale - workSpaceTheme.taskInstance.size / 2,
+                  }}
+                />
+              )}
               {demonstrationsToRender.map(([x, y, z, { id, score, joint_angles }], index) =>
                 <span
                   key={index}
