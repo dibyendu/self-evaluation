@@ -578,9 +578,23 @@ export default function App() {
 
                     if (success) {
                       if (variance.some(v => v >= 1.0e-4))
-                        toast(`Object pose detection is not quite accurate.\n\nAdjust the blue dot in the interface.`, { duration: 5000, style: { color: 'white', background: 'black' }})
+                        toast(
+                          <span>
+                            Object pose detection is not quite accurate.
+                            <br/>
+                            Adjust the <span style={{ color: 'royalblue' }}><i>blue dot</i></span> in the interface.
+                          </span>,
+                          { duration: 5000, style: { color: 'white', background: 'black', textAlign: 'center' }}
+                        )
                       else if (!isValid)
-                        toast(`Object is not within the yellow cloud.\n\nAdjust the object on the table.`, { duration: 5000, style: { color: 'white', background: 'black' }})
+                        toast(
+                          <span>
+                            Object is not within the <span style={{ color: 'rgba(255,255,0,0.4)' }}><i>yellow region(s)</i></span>.
+                            <br/>
+                            Adjust the object on the table.
+                          </span>,
+                          { duration: 5000, style: { color: 'white', background: 'black', textAlign: 'center' }}
+                        )
                     }
 
                     setObjectPose({ x, y })
