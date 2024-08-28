@@ -7,6 +7,22 @@ const config = JSON.parse(Deno.readTextFileSync('demonstration_config.json')),
       {min: yMin, max: yMax} = config.dimensions.find(c => c.name === 'y')
 
 
+function boxMullerTransform() {
+  const u1 = Math.random(),
+        u2 = Math.random()
+  
+  const z0 = Math.sqrt(-2.0 * Math.log(u1)) * Math.cos(2.0 * Math.PI * u2),
+        z1 = Math.sqrt(-2.0 * Math.log(u1)) * Math.sin(2.0 * Math.PI * u2)
+  
+  return { z0, z1 }
+}
+
+function getNormallyDistributedRandomNumber(mean, stddev) {
+  const { z0, _ } = boxMullerTransform()
+  return z0 * stddev + mean
+}
+
+
 const router = new Router()
 
 router
@@ -14,7 +30,25 @@ router
   context.response.body = { status: true }
 })
 .get('/pose', context => {
-  context.response.body = { success: true, x: Math.random() * (xMax - xMin) + xMin, y: Math.random() * (yMax - yMin) + yMin }
+  const x = Math.random() * (xMax - xMin) + xMin,
+        y = Math.random() * (yMax - yMin) + yMin
+
+  const exponent = Math.floor(Math.random() * (7 - 3 + 1) + 3),
+        variance = 1.0 / 10**exponent
+
+  const sampleX = [],
+        sampleY = []
+  for (let i = 0; i < 10; i += 1) {
+      sampleX.push(getNormallyDistributedRandomNumber(x, Math.sqrt(variance)))
+      sampleY.push(getNormallyDistributedRandomNumber(y, Math.sqrt(variance)))
+  }
+
+  const meanX = sampleX.reduce((acc, i) => acc + i, 0) / sampleX.length,
+        meanY = sampleY.reduce((acc, i) => acc + i, 0) / sampleY.length,
+        varX = sampleX.reduce((acc, i) => acc + (i - meanX)**2, 0) / sampleX.length,
+        varY = sampleY.reduce((acc, i) => acc + (i - meanY)**2, 0) / sampleY.length
+
+  context.response.body = { success: true, x: meanX, y: meanY, variance: [varX, varY] }
 })
 .post('/start', async context => {    
   const { object_location: { x, y }} = await context.request.body.json()

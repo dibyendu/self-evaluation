@@ -144,7 +144,7 @@ EOF''')
   if output['success']:
     [fx, fy, _] = output['location']                     # in franka's base
     [bx, by] = [1.3005 + fy, 0.87035 - fx]               # in baxter's base
-    return jsonify({ 'success': True, 'x': bx, 'y': by })
+    return jsonify({ 'success': True, 'x': bx, 'y': by, 'variance': output['variance'][:2] })
   else:
     return jsonify({ 'success': False, 'message': output['message'] })
 
