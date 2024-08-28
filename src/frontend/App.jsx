@@ -591,7 +591,7 @@ export default function App() {
                       else if (!isValid)
                         toast(
                           <span>
-                            Detected object is not within the <span style={{ color: 'rgba(255,255,0,0.4)' }}><i>yellow region(s)</i> inside the work-area</span>.
+                            Detected object is not within the <span style={{ color: 'rgba(255,255,0,0.4)' }}><i>yellow region(s)</i></span> inside the work-area.
                             <br/>
                             Adjust the object on the table.
                           </span>,
