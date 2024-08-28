@@ -540,7 +540,9 @@ export default function App() {
 
                         if (!visualAssistanceEnabled) {
                           const [total, total_failed] = Object.entries(metadata).reduce(([total, total_failed], [,{ task_instances, failed_indices }]) => [total + task_instances.length, total_failed + failed_indices.length], [0, 0])
-                          toast(`Overall Success Probability: ${Math.round((total - total_failed) * 10000 / total) / 100}%`, { duration: 8000, style: { color: 'white', background: 'black' }})
+                          const probability = Math.round((total - total_failed) * 10000 / total) / 100
+                          console.log(`Overall Success Probability: ${probability}%`)
+                          toast(`Overall Success Probability: ${probability}%`, { duration: 8000, style: { color: 'white', background: 'black' }})
                         }
 
                         sessionStorage.setItem('end-time', `${Date.now()}`)
@@ -582,14 +584,14 @@ export default function App() {
                           <span>
                             Object pose detection is not quite accurate.
                             <br/>
-                            Adjust the <span style={{ color: 'royalblue' }}><i>blue dot</i></span> in the interface.
+                            You may need to adjust the <span style={{ color: 'royalblue' }}><i>blue dot</i></span> in the interface.
                           </span>,
                           { duration: 5000, style: { color: 'white', background: 'black', textAlign: 'center' }}
                         )
                       else if (!isValid)
                         toast(
                           <span>
-                            Object is not within the <span style={{ color: 'rgba(255,255,0,0.4)' }}><i>yellow region(s)</i></span>.
+                            Detected object is not within the <span style={{ color: 'rgba(255,255,0,0.4)' }}><i>yellow region(s)</i> inside the work-area</span>.
                             <br/>
                             Adjust the object on the table.
                           </span>,
