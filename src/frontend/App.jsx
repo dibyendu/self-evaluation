@@ -538,9 +538,15 @@ export default function App() {
 
                         setProcessing(false)
 
+                        const [total, total_failed] = Object.entries(metadata).reduce(([total, total_failed], [,{ task_instances, failed_indices }]) => [total + task_instances.length, total_failed + failed_indices.length], [0, 0])
+                        const probability = Math.round((total - total_failed) * 10000 / total) / 100                        
+                        let intermediate_times = []
+                        if (demonstrations.length > 1)
+                          intermediate_times = JSON.parse(sessionStorage.getItem('intermediate-times') ?? [])
+                        intermediate_times.push({ probability, timestamp: Date.now() })
+                        sessionStorage.setItem('intermediate-times', JSON.stringify(intermediate_times))
+                        sessionStorage.setItem('end-time', `${Date.now()}`)
                         if (!visualAssistanceEnabled) {
-                          const [total, total_failed] = Object.entries(metadata).reduce(([total, total_failed], [,{ task_instances, failed_indices }]) => [total + task_instances.length, total_failed + failed_indices.length], [0, 0])
-                          const probability = Math.round((total - total_failed) * 10000 / total) / 100
                           console.log(`Overall Success Probability: ${probability}%`)
                           toast(`Overall Success Probability: ${probability}%`, { duration: 8000, style: { color: 'white', background: 'black' }})
                         }
@@ -835,7 +841,7 @@ export default function App() {
                 </div>
               )}
               <div style={{ position: 'relative' }}>
-                <span className='material-symbols-outlined' title='Display Time Information' style={{ cursor: 'pointer', fontSize: 40 }} onClick={() =>
+                <span className='material-symbols-outlined' title='Display Time Information' style={{ cursor: 'pointer', fontSize: 40 }} onClick={() => {
                   console.table({
                     '(A) Total Time': { 'Time (ms)': parseInt(sessionStorage.getItem('end-time')) - parseInt(sessionStorage.getItem('start-time')) },
                     '(B) Pose Detection Time': { 'Time (ms)': parseInt(sessionStorage.getItem('pose-estimation-time')) },
@@ -843,7 +849,9 @@ export default function App() {
                     '(D) Demonstration Acquisition Time': { 'Time (ms)': parseInt(sessionStorage.getItem('demonstration-acquisition-time')), Human: '✓' },
                     '(E) Simulation Time': { 'Time (ms)': parseInt(sessionStorage.getItem('simulation-time')) }
                   })
-                }>
+                  console.log('======== Intermediate Times ========')
+                  console.log(JSON.parse(sessionStorage.getItem('intermediate-times') ?? []))
+                }}>
                   timer
                 </span>
               </div>
