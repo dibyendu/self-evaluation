@@ -44,9 +44,9 @@ def visualise():
   return send_from_directory(frontend_folder, 'visualise.html')
 
 
-@app.route('/assets/<path:filename>')
+@app.route('/self-evaluation/assets/<path:filename>')
 def static_files(filename):
-  return send_from_directory('%s/assets' % frontend_folder, filename)
+  return send_from_directory('%s/self-evaluation/assets' % frontend_folder, filename)
 
 
 
