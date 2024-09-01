@@ -11,7 +11,7 @@ export default defineConfig({
   root: 'src/frontend',
   build: {
     outDir: '../frontend_compiled',
-    assetsDir: 'self-evaluation',
+    assetsDir: 'self-evaluation/assets',
     rollupOptions: {
       input: [
         'src/frontend/index.html',

@@ -43,6 +43,8 @@ jobs:
       - name: Build the Website
         run: |
           npm run build
+          mv src/frontend_compiled/self-evaluation/assets src/frontend_compiled
+          rm -rf src/frontend_compiled/self-evaluation
 
       - name: Upload Artifact
         uses: actions/upload-pages-artifact@v3
