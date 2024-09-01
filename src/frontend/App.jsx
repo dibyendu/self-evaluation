@@ -236,6 +236,7 @@ function App() {
   const [demoConfigAvailable, setDemoConfigAvailable] = useState(false)
   const [robotConfigAvailable, setRobotConfigAvailable] = useState(false)
   const [demonstrationAvailable, setDemonstrationAvailable] = useState(false)
+  const [confidenceMessage, setConfidenceMessage] = useState('')
 
   const [workSpaceConfig, setWorkSpaceConfig] = useState(null)
 
@@ -563,8 +564,12 @@ function App() {
                         }
 
                         sessionStorage.setItem('end-time', `${Date.now()}`)
-                        if (worst_arm_failure_probability < 1 + ε - β)
-                          alert('No more demonstration is required')
+                        if (worst_arm_failure_probability < 1 + ε - β) {
+                            setConfidenceMessage(`with ${(1- δ) * 100}% confidence, the overall success probability is ≥ ${β * 100}%`)
+                            alert('No more demonstration is required')
+                        }
+                          
+
                       }
                     })
                   })
@@ -627,12 +632,18 @@ function App() {
             </button>
           </div>
           <>
-            {!demonstrationAvailable ? <h3>Robot's Workarea</h3> : <h3>Robot's Belief</h3>}
+            {!demonstrationAvailable ? <h3>Robot's Workspace</h3> : (
+              <>
+                <h3 style={{ margin: 0 }}>Robot's Belief</h3>
+                <h4 style={{ marginTop: 0, color: 'green' }}>{confidenceMessage}</h4>
+              </>
+            )}
             <div style={{ display: 'flex', flexDirection: 'column', margin: '0 auto', justifyContent: 'center', alignItems: 'center', position: 'relative' }}>
               <img
                 src={`data:image/svg+xml;utf8,${encodeURIComponent(formatString(robotImageData, '#000000'))}`}
                 onClick={() => setMiniMapEnabled(enabled => !enabled)}
                 onLoad={({ target }) => setRobotImageDimensions({ width: target.width, height: target.height })}
+                title='Click to see the scaled representation of the workspace'
                 style={{
                   zIndex: -1,
                   opacity: 0.2,
@@ -764,6 +775,7 @@ function App() {
                         x: { ...config.x, n_segments: parseInt(value) }
                       }))
                       setDemonstrationAvailable(false)
+                      setConfidenceMessage('')
                       setObjectPose(null)
                       setObjectPoseDetected(false)
                       setObjectPoseValid(false)
@@ -789,6 +801,7 @@ function App() {
                         y: { ...config.y, n_segments: parseInt(value) }
                       }))
                       setDemonstrationAvailable(false)
+                      setConfidenceMessage('')
                       setObjectPose(null)
                       setObjectPoseDetected(false)
                       setObjectPoseValid(false)
@@ -820,6 +833,7 @@ function App() {
                     <span className='material-symbols-rounded' title='Reset saved demonstrations' style={{ cursor: 'pointer', fontSize: 40 }} onClick={() => {
                       sessionStorage.removeItem('demonstrations')
                       setDemonstrationAvailable(false)
+                      setConfidenceMessage('')
                       setObjectPose(null)
                       setObjectPoseDetected(false)
                       setObjectPoseValid(false)
@@ -842,6 +856,7 @@ function App() {
                     setRobotConfigAvailable(false)
                     setDemoConfigAvailable(false)
                     setDemonstrationAvailable(false)
+                    setConfidenceMessage('')
                     setObjectPose(null)
                     setObjectPoseDetected(false)
                     setObjectPoseValid(false)
