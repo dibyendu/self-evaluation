@@ -1,7 +1,4 @@
-[![Open in StackBlitz](https://developer.stackblitz.com/img/open_in_stackblitz_small.svg)](https://stackblitz.com/~/github/dibyendu/self-evaluation/tree/backend) &nbsp;&nbsp;&nbsp;&nbsp; <a alt='YouTube Video' href='https://youtu.be/R-qICICdEos' target='_blank'><img alt='YouTube Video' src='https://img.shields.io/badge/YouTube-red?style=flat&logo=youtube&logoColor=red&label=Watch%20on&labelColor=black'></a>
-
-
-
+[![Open in StackBlitz](https://developer.stackblitz.com/img/open_in_stackblitz_small.svg)](https://stackblitz.com/~/github/dibyendu/self-evaluation/tree/backend) &nbsp;&nbsp;&nbsp;&nbsp; <a alt='YouTube Video' href='https://youtu.be/R-qICICdEos'><img alt='YouTube Video' src='https://img.shields.io/badge/YouTube-red?style=flat&logo=youtube&logoColor=red&label=Watch%20on&labelColor=black'></a>
 
 ![belief](https://github.com/user-attachments/assets/77b3ee97-9630-4d39-97b8-f65cd83fdccb)
 
