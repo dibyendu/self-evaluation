@@ -166,7 +166,7 @@ function PlanInfo({ style, position, plans }) {
                     <span className='material-symbols-rounded' style={{ cursor: 'pointer', verticalAlign: 'text-bottom' }} onClick={() => {
                       const state = { plan, position, screw_segments }
                       localStorage.setItem('navigation_state', JSON.stringify(state))
-                      window.open('/visualise', '_blank', 'noreferrer')
+                      window.open(`${window.location.href}/visualise`, '_blank', 'noreferrer')
                     }}>
                       visibility
                     </span>
@@ -725,7 +725,7 @@ function App() {
                     joint_angles = nj.array(joint_angles)
                     const state = { plan: joint_angles.slice(null, [1,8]).tolist(), timestamps: joint_angles.slice(null, [0,1]).tolist().flat(), position: [x, y, z] }                        
                     localStorage.setItem('navigation_state', JSON.stringify(state))
-                    window.open('/visualise', '_blank', 'noreferrer')
+                    window.open(`${window.location.href}/visualise`, '_blank', 'noreferrer')
                   }}
                 >
                   {id}
