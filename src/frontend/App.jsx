@@ -40,7 +40,7 @@ const defaultWorkSpaceTheme = {
 const robotImageWidth = 400,           // px
       robotActualWidth = 1.38218381155 // m
 
-const permissibleRadius = 5 // cm
+const permissibleRadius = 6            // cm
 
 
 function calculate_plan_score(joint_limits, joint_angles) {
@@ -879,8 +879,9 @@ function App() {
                     '(D) Demonstration Acquisition Time': { 'Time (ms)': parseInt(sessionStorage.getItem('demonstration-acquisition-time')), Human: '✓' },
                     '(E) Simulation Time': { 'Time (ms)': parseInt(sessionStorage.getItem('simulation-time')) }
                   })
-                  console.log('======== Intermediate Timestamps ========')
-                  console.table(JSON.parse(sessionStorage.getItem('intermediate-times') ?? []))
+                  console.log('======== Intermediate Times ========')
+                  const times = JSON.parse(sessionStorage.getItem('intermediate-times') ?? [])
+                  console.table(times.map(({ probability, timestamp }, index, array) => ({ Probability: probability / 100, 'Time taken (ms)': index === 0 ? 0 : timestamp - array[0].timestamp })))
                 }}>
                   timer
                 </span>
@@ -894,7 +895,6 @@ function App() {
           </>
         </>
       }
-      <Toaster position='bottom-center' toastOptions={{ duration: 4000 }} />
       {demoConfigAvailable && robotConfigAvailable && (
         <div onClick={() => setMiniMapEnabled(enabled => !enabled)} style={{ width: '100%', height: '100%', backgroundColor: '#000000f2', position: 'absolute', top: 0, left: 0, zIndex: 1, display: miniMapEnabled ? 'flex' : 'none', justifyContent: 'center', alignItems: 'center' }}>
           <div style={{ margin: '0 auto', position: 'relative' }}>
@@ -954,6 +954,7 @@ function App() {
           </div>
         </div>
       )}
+      <Toaster position='bottom-center' toastOptions={{ duration: 4000 }} />
     </div>
   )
 }
