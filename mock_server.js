@@ -2,7 +2,7 @@ import { oakCors } from 'https://deno.land/x/cors/mod.ts'
 import { Application, Router, Status } from 'https://deno.land/x/oak/mod.ts'
 
 
-const demonstrations_path = 'demonstrations/interactive_scoop'
+const demonstrations_path = 'demonstrations/pour'
 
 const config = JSON.parse(Deno.readTextFileSync('demonstration_config.json')),
       {min: xMin, max: xMax} = config.dimensions.find(c => c.name === 'x'),
