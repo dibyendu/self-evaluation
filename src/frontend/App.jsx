@@ -12,11 +12,14 @@ import {
   demonstrationConfigurationFile,
   demonstrationConfigurationFormat
 } from './Config'
-import './css/style.css'
 import naivePAC from './Bandit'
-import robotImageUrl from './img/robot_top_view.svg'
+
+import './css/style.css'
+import start from './audio/start.mp3'
+import robotImageData from './img/robot_top_view.svg?raw'
 
 
+const startAudio = new Audio(start)
 
 
 const robotConfiguration = import.meta.glob('../../baxter_config/*.csv', { query: '?raw' })
@@ -33,7 +36,8 @@ const defaultWorkSpaceTheme = {
   taskInstance: { size: 4, success: '#00ff00', failure: '#ff0000', hint: '#ffff00' }
 }
 
-const robotImageWidth = 400
+const robotImageWidth = 400,           // px
+      robotActualWidth = 1.38218381155 // m
 
 const permissibleRadius = 5 // cm
 
@@ -76,6 +80,9 @@ function cartesianProduct(iterables, repeat) {
   }, [[]])
 }
 
+function formatString(template, ...args) {
+  return template.replace(/\{([0-9]+)\}/g, (match, index) => typeof args[index] === 'undefined' ? match : args[index])
+}
 
 function Theme({ open, setOpen, applyTheme }) {
 
@@ -247,6 +254,8 @@ export default function App() {
 
   const [demonstrationProcessPID, setDemonstrationProcessPID] = useState(null)
 
+  const [miniMapEnabled, setMiniMapEnabled] = useState(false)
+
   const [objectPose, setObjectPose] = useState(null)
   const [isObjectPoseValid, setObjectPoseValid] = useState(false)
   const [objectPoseDetected, setObjectPoseDetected] = useState(false)
@@ -386,6 +395,7 @@ export default function App() {
                       return response.json()
                   })
                   .then(({ pid }) => {
+                    startAudio.play()
                     sessionStorage.setItem('start-demonstration-acquisition-time', `${Date.now()}`)
                     setDemonstrationProcessPID(pid)
                   })
@@ -553,7 +563,7 @@ export default function App() {
 
                         sessionStorage.setItem('end-time', `${Date.now()}`)
                         if (worst_arm_failure_probability < 1 + ε - β)
-                          alert('No more demonstration is required')                        
+                          alert('No more demonstration is required')
                       }
                     })
                   })
@@ -619,13 +629,17 @@ export default function App() {
             {!demonstrationAvailable ? <h3>Robot's Workarea</h3> : <h3>Robot's Belief</h3>}
             <div style={{ display: 'flex', flexDirection: 'column', margin: '0 auto', justifyContent: 'center', alignItems: 'center', position: 'relative' }}>
               <img
-                src={robotImageUrl}
+                src={`data:image/svg+xml;utf8,${encodeURIComponent(formatString(robotImageData, '#000000'))}`}
+                onClick={() => setMiniMapEnabled(enabled => !enabled)}
                 onLoad={({ target }) => setRobotImageDimensions({ width: target.width, height: target.height })}
                 style={{
-                  position: 'absolute', zIndex: -1, opacity: 0.2,
+                  zIndex: -1,
+                  opacity: 0.2,
+                  cursor: 'pointer',
+                  position: 'absolute',
                   width: robotImageWidth,
                   bottom: - robotImageDimensions.height / 2,
-                  right: - robotImageDimensions.width / 2 - workSpaceConfig.y.min * workSpaceTheme.scale
+                  left: workSpaceConfig.y.max * workSpaceTheme.scale - robotImageDimensions.width / 2
                 }}
               />
               {Array(workSpaceConfig.x.n_segments).fill().map((_, row) => {
@@ -849,8 +863,8 @@ export default function App() {
                     '(D) Demonstration Acquisition Time': { 'Time (ms)': parseInt(sessionStorage.getItem('demonstration-acquisition-time')), Human: '✓' },
                     '(E) Simulation Time': { 'Time (ms)': parseInt(sessionStorage.getItem('simulation-time')) }
                   })
-                  console.log('======== Intermediate Times ========')
-                  console.log(JSON.parse(sessionStorage.getItem('intermediate-times') ?? []))
+                  console.log('======== Intermediate Timestamps ========')
+                  console.table(JSON.parse(sessionStorage.getItem('intermediate-times') ?? []))
                 }}>
                   timer
                 </span>
@@ -865,6 +879,66 @@ export default function App() {
         </>
       }
       <Toaster position='bottom-center' toastOptions={{ duration: 4000 }} />
+      {demoConfigAvailable && robotConfigAvailable && (
+        <div onClick={() => setMiniMapEnabled(enabled => !enabled)} style={{ width: '100%', height: '100%', backgroundColor: '#000000f2', position: 'absolute', top: 0, left: 0, zIndex: 1, display: miniMapEnabled ? 'flex' : 'none', justifyContent: 'center', alignItems: 'center' }}>
+          <div style={{ margin: '0 auto', position: 'relative' }}>
+            <img
+              src={`data:image/svg+xml;utf8,${encodeURIComponent(formatString(robotImageData, '#ffffff'))}`}
+              style={{
+                zIndex: -1,
+                opacity: 0.2,
+                cursor: 'pointer',
+                position: 'absolute',
+                width: robotImageWidth,
+                top: workSpaceConfig.x.max * robotImageWidth / robotActualWidth - robotImageDimensions.height * 70.984786371 / 100,
+                left: workSpaceConfig.y.max * robotImageWidth / robotActualWidth - robotImageDimensions.width * 50 / 100
+              }}
+            />
+            {Array(workSpaceConfig.x.n_segments).fill().map((_, row) => {
+              const cellWidth = robotImageWidth * (workSpaceConfig.y.max - workSpaceConfig.y.min) / (robotActualWidth * workSpaceConfig.y.n_segments),
+                    cellHeight = robotImageWidth * (workSpaceConfig.x.max - workSpaceConfig.x.min) / (robotActualWidth * workSpaceConfig.x.n_segments)
+              return (
+                <div key={row} style={{ width: cellWidth * workSpaceConfig.y.n_segments, height: cellHeight, display: 'flex', flexDirection: 'row' }}>
+                  {
+                    Array(workSpaceConfig.y.n_segments).fill().map((_, column) => {
+                      return  (
+                        <div
+                          key={column}
+                          style={Object.assign(
+                            {
+                              width: cellWidth,
+                              height: cellHeight,
+                              borderRight: '1px solid white',
+                              borderBottom: '1px solid white'
+                            },
+                            row === 0 ? { borderTop: '1px solid white' } : {},
+                            column === 0 ? { borderLeft: '1px solid white' } : {}
+                          )}
+                        />                            
+                      )
+                    }) 
+                  }
+                </div>
+              )
+            })}
+            {objectPose !== null && (
+              <span
+                style={{
+                  zIndex: 1,
+                  opacity: 0.6,
+                  position: 'absolute',
+                  backgroundColor: 'yellow',
+                  width: 6,
+                  height: 6,
+                  borderRadius: 3,
+                  top: (workSpaceConfig.x.max - objectPose.x) * robotImageWidth / robotActualWidth - 3,
+                  left: (workSpaceConfig.y.max - objectPose.y) * robotImageWidth / robotActualWidth - 3
+                }}
+              />
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
