@@ -414,13 +414,13 @@ function App() {
                     if (response.ok)
                       return response.json()
                   })
-                  .then(({ demonstration }) => {
+                  .then(({ demonstration, pose = { x: objectPose.x, y: objectPose.y }}) => {
                     sessionStorage.setItem('start-simulation-time', `${Date.now()}`)
                     const objectLocation = nj.array([
-                      [ 1, 0, 0,  objectPose.x        ],
-                      [ 0, 1, 0,  objectPose.y        ],
+                      [ 1, 0, 0,  pose.x              ],
+                      [ 0, 1, 0,  pose.y              ],
                       [ 0, 0, 1, -0.06447185171756116 ],
-                      [ 0, 0, 0,  1                   ],
+                      [ 0, 0, 0,  1                   ]
                     ]).tolist().map(row => row.join(',')).join('\r\n')
 
                     const savedDemonstrations = JSON.parse(sessionStorage.getItem('demonstrations') ?? '{}')
