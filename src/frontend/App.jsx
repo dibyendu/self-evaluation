@@ -2,6 +2,7 @@ import nj from 'https://esm.run/numjs'
 import JSZip from 'https://esm.run/jszip'
 import FileSaver from 'https://esm.run/file-saver'
 import toast, { Toaster } from 'react-hot-toast'
+import { createRoot } from 'react-dom/client'
 import { useCallback, useEffect, useState, useRef } from 'react'
 
 import {
@@ -227,7 +228,7 @@ function calculateTimeElapsed(key) {
 }
 
 
-export default function App() {
+function App() {
 
   const firstCellRef = useRef(null)
   const draggableRef = useRef(null)
@@ -941,3 +942,6 @@ export default function App() {
     </div>
   )
 }
+
+
+createRoot(document.getElementById('root')).render(<App />)

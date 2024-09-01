@@ -1,3 +1,4 @@
+import { createRoot } from 'react-dom/client'
 import { useCallback, useEffect, useMemo } from 'react'
 
 import nj from 'https://esm.run/numjs'
@@ -49,7 +50,7 @@ const downsamplingRange = {
 
 
 
-export default function App() {
+function App() {
 
   const jointVisualizationLimits = useMemo(() => {
     const joint_limits = nj.array(localStorage.getItem('joint_limits').split('\n').map(row => row.split(',').map(cell => parseFloat(cell))))
@@ -843,3 +844,6 @@ export default function App() {
     </>
   )
 }
+
+
+createRoot(document.getElementById('root')).render(<App />)
