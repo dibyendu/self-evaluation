@@ -887,7 +887,6 @@ export default function App() {
               style={{
                 zIndex: -1,
                 opacity: 0.2,
-                cursor: 'pointer',
                 position: 'absolute',
                 width: robotImageWidth,
                 top: workSpaceConfig.x.max * robotImageWidth / robotActualWidth - robotImageDimensions.height * 70.984786371 / 100,
