@@ -707,7 +707,7 @@ function App() {
                   key={index}
                   style={{
                     position: 'absolute',
-                    boxShadow: `0 0 50px 50px ${workSpaceTheme.taskInstance.hint}66`,
+                    boxShadow: `0 0 50px 65px ${workSpaceTheme.taskInstance.hint}66`,
                     top: (workSpaceConfig.x.max - x) * workSpaceTheme.scale - workSpaceTheme.taskInstance.size / 2,
                     left: (workSpaceConfig.y.max - y) * workSpaceTheme.scale - workSpaceTheme.taskInstance.size / 2,
                   }}
@@ -939,13 +939,13 @@ function App() {
             {objectPose !== null && (
               <span
                 style={{
-                  zIndex: 1,
-                  opacity: 0.6,
-                  position: 'absolute',
-                  backgroundColor: 'yellow',
                   width: 6,
                   height: 6,
+                  zIndex: 1,
+                  opacity: 0.6,
                   borderRadius: 3,
+                  position: 'absolute',
+                  backgroundColor: 'yellow',
                   top: (workSpaceConfig.x.max - objectPose.x) * robotImageWidth / robotActualWidth - 3,
                   left: (workSpaceConfig.y.max - objectPose.y) * robotImageWidth / robotActualWidth - 3
                 }}
