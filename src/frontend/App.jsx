@@ -37,10 +37,9 @@ const defaultWorkSpaceTheme = {
   taskInstance: { size: 4, success: '#00ff00', failure: '#ff0000', hint: '#ffff00' }
 }
 
-const robotImageWidth = 400,           // px
-      robotActualWidth = 1.38218381155 // m
-
-const permissibleRadius = 6            // cm
+const robotImageWidth = 400,            // px
+      robotActualWidth = 1.38218381155, // m
+      permissibleRadius = 6             // cm
 
 
 function calculate_plan_score(joint_limits, joint_angles) {
@@ -150,7 +149,7 @@ function PlanInfo({ style, position, plans }) {
                   <td>
                     <span className='material-symbols-rounded' style={{ cursor: 'pointer', verticalAlign: 'text-bottom' }} onClick={() => {
                       const [x, y, z] = position
-                      const demonstration = JSON.parse(sessionStorage.getItem('demonstrations'))[demonstration_id]
+                      const demonstration = JSON.parse(sessionStorage.getItem(`demonstration-${demonstration_id}`))
 
                       const zip = new JSZip()
                       zip.file('object_position.txt', `x: ${x}\ny: ${y}\nz: ${z}`)
@@ -336,7 +335,19 @@ function App() {
             workSpaceConfig.x.max >= x && x >= workSpaceConfig.x.min && workSpaceConfig.y.max >= y && y >= workSpaceConfig.y.min
           ) && (
             nextDemonstrationToRender.length === 0 ||
-            nextDemonstrationToRender.some(([xn, yn]) => Math.sqrt(Math.abs((xn - x)**2) + Math.abs((yn - y)**2)) * 100 <= permissibleRadius)
+            // nextDemonstrationToRender.some(([xn, yn]) => Math.sqrt(Math.abs((xn - x)**2) + Math.abs((yn - y)**2)) * 100 <= permissibleRadius)
+            Array(workSpaceConfig.x.n_segments).fill().some((_, row) => {
+              const width = (workSpaceConfig.y.max - workSpaceConfig.y.min) / workSpaceConfig.y.n_segments,
+                    height = (workSpaceConfig.x.max - workSpaceConfig.x.min) / workSpaceConfig.x.n_segments
+              return Array(workSpaceConfig.y.n_segments).fill().some((_, column) => {
+                const xMax = workSpaceConfig.x.max - height * row,
+                      yMax = workSpaceConfig.y.max - width * column
+                return (
+                  nextDemonstrationToRender.some(([xn, yn]) => xMax >= xn && xn >= xMax - height && yMax >= yn && yn >= yMax - width) &&
+                  xMax >= x && x >= xMax - height && yMax >= y && y >= yMax - width
+                )
+              })
+            })
           )
         )
       }
@@ -423,7 +434,10 @@ function App() {
                       [ 0, 0, 0,  1                   ]
                     ]).tolist().map(row => row.join(',')).join('\r\n')
 
-                    const savedDemonstrations = JSON.parse(sessionStorage.getItem('demonstrations') ?? '{}')
+                    const savedDemonstrations = {},
+                          demonstrationsCount = parseInt(sessionStorage.getItem('demonstrations') ?? '0')
+                    for (let i = 0; i < demonstrationsCount; i++)
+                      savedDemonstrations[i+1] = JSON.parse(sessionStorage.getItem(`demonstration-${i+1}`))
 
                     let joint_limits = localStorage.getItem('joint_limits')
                     joint_limits = nj.array(joint_limits.split('\n').map(row => row.split(',').map(cell => parseFloat(cell))))
@@ -441,10 +455,11 @@ function App() {
                       nj.array(demonstration.split('\n').slice(1).map(row => row.split(',').map(cell => parseFloat(cell))))
                     )
 
-                    sessionStorage.setItem('demonstrations', JSON.stringify(savedDemonstrations))
                     setObjectPose(null)
                     setObjectPoseValid(false)
                     setObjectPoseDetected(false)
+                    sessionStorage.setItem('demonstrations', `${demonstrationsCount + 1}`)
+                    sessionStorage.setItem(`demonstration-${demonstrationsCount + 1}`, JSON.stringify(savedDemonstrations[index]))
 
                     const demonstrations = Object.entries(savedDemonstrations).map(([index, demo]) => ({
                       id: parseInt(index),
@@ -555,7 +570,14 @@ function App() {
                         let intermediate_times = []
                         if (demonstrations.length > 1)
                           intermediate_times = JSON.parse(sessionStorage.getItem('intermediate-times') ?? [])
-                        intermediate_times.push({ probability, timestamp: Date.now() })
+                        intermediate_times.push({
+                          probability,
+                          timestamp: Date.now(),
+                          simulation_time: parseInt(sessionStorage.getItem('simulation-time') ?? 0),
+                          pose_estimation_time: parseInt(sessionStorage.getItem('pose-estimation-time') ?? 0),
+                          demonstration_preparation_time: parseInt(sessionStorage.getItem('demonstration-preparation-time') ?? 0),
+                          demonstration_acquisition_time: parseInt(sessionStorage.getItem('demonstration-acquisition-time') ?? 0)
+                        })
                         sessionStorage.setItem('intermediate-times', JSON.stringify(intermediate_times))
                         sessionStorage.setItem('end-time', `${Date.now()}`)
                         if (!visualAssistanceEnabled) {
@@ -568,7 +590,6 @@ function App() {
                             setConfidenceMessage(`with ${(1- δ) * 100}% confidence, the overall success probability is ≥ ${β * 100}%`)
                             alert('No more demonstration is required')
                         }
-                          
 
                       }
                     })
@@ -597,20 +618,23 @@ function App() {
                       workSpaceConfig.x.max >= x && x >= workSpaceConfig.x.min && workSpaceConfig.y.max >= y && y >= workSpaceConfig.y.min
                     ) && (
                       nextDemonstrationToRender.length === 0 ||
-                      nextDemonstrationToRender.some(([xn, yn]) => Math.sqrt(Math.abs((xn - x)**2) + Math.abs((yn - y)**2)) * 100 <= permissibleRadius)
+                      // nextDemonstrationToRender.some(([xn, yn]) => Math.sqrt(Math.abs((xn - x)**2) + Math.abs((yn - y)**2)) * 100 <= permissibleRadius)
+                      Array(workSpaceConfig.x.n_segments).fill().some((_, row) => {
+                        const width = (workSpaceConfig.y.max - workSpaceConfig.y.min) / workSpaceConfig.y.n_segments,
+                              height = (workSpaceConfig.x.max - workSpaceConfig.x.min) / workSpaceConfig.x.n_segments
+                        return Array(workSpaceConfig.y.n_segments).fill().some((_, column) => {
+                          const xMax = workSpaceConfig.x.max - height * row,
+                                yMax = workSpaceConfig.y.max - width * column
+                          return (
+                            nextDemonstrationToRender.some(([xn, yn]) => xMax >= xn && xn >= xMax - height && yMax >= yn && yn >= yMax - width) &&
+                            xMax >= x && x >= xMax - height && yMax >= y && y >= yMax - width
+                          )
+                        })
+                      })
                     )
 
                     if (success) {
-                      if (variance.some(v => v >= 1.0e-4))
-                        toast(
-                          <span>
-                            Object pose detection is not quite accurate.
-                            <br/>
-                            You may need to adjust the <span style={{ color: 'royalblue' }}><i>blue dot</i></span> in the interface.
-                          </span>,
-                          { duration: 5000, style: { color: 'white', background: 'black', textAlign: 'center' }}
-                        )
-                      else if (!isValid)
+                      if (!isValid)
                         toast(
                           <span>
                             Detected object is not within the <span style={{ color: 'rgba(255,255,0,0.4)' }}><i>yellow region(s)</i></span> inside the work-area.
@@ -619,6 +643,15 @@ function App() {
                           </span>,
                           { duration: 5000, style: { color: 'white', background: 'black', textAlign: 'center' }}
                         )
+                      // else if (variance.some(v => v >= 1.0e-4))
+                      //   toast(
+                      //     <span>
+                      //       Object pose detection is not quite accurate.
+                      //       <br/>
+                      //       You may need to adjust the <span style={{ color: 'royalblue' }}><i>blue dot</i></span> in the interface.
+                      //     </span>,
+                      //     { duration: 5000, style: { color: 'white', background: 'black', textAlign: 'center' }}
+                      //   )
                     }
 
                     setObjectPose({ x, y })
@@ -655,27 +688,32 @@ function App() {
                 }}
               />
               {Array(workSpaceConfig.x.n_segments).fill().map((_, row) => {
-                const cellWidth = (workSpaceConfig.y.max - workSpaceConfig.y.min) * workSpaceTheme.scale / workSpaceConfig.y.n_segments,
-                      cellHeight = (workSpaceConfig.x.max - workSpaceConfig.x.min) * workSpaceTheme.scale / workSpaceConfig.x.n_segments
+                const width = (workSpaceConfig.y.max - workSpaceConfig.y.min) / workSpaceConfig.y.n_segments,
+                      height = (workSpaceConfig.x.max - workSpaceConfig.x.min) / workSpaceConfig.x.n_segments,
+                      cellWidth = width * workSpaceTheme.scale,
+                      cellHeight = height * workSpaceTheme.scale
                 return (
                   <div key={row} style={{ width: cellWidth * workSpaceConfig.y.n_segments, height: cellHeight, display: 'flex', flexDirection: 'row' }}>
                     {
                       Array(workSpaceConfig.y.n_segments).fill().map((_, column) => {
-                        const probability = probabilityHeatMap[workSpaceConfig.x.n_segments * workSpaceConfig.y.n_segments - row * workSpaceConfig.x.n_segments - column]
+                        const xMax = workSpaceConfig.x.max - height * row,
+                              yMax = workSpaceConfig.y.max - width * column,
+                              isSuggestionBox = nextDemonstrationToRender.some(([x, y]) => xMax >= x && x >= xMax - height && yMax >= y && y >= yMax - width),
+                              probability = probabilityHeatMap[workSpaceConfig.x.n_segments * workSpaceConfig.y.n_segments - row * workSpaceConfig.x.n_segments - column]
                         return  (
                           <div
-                            ref={row === 0 && column === 0 ? firstCellRef : null}
                             key={column}
+                            ref={row === 0 && column === 0 ? firstCellRef : null}
                             style={Object.assign(
                               {
                                 width: cellWidth,
                                 height: cellHeight,
-                                borderRight: `${workSpaceTheme.border.width}px solid ${workSpaceTheme.border.color}`,
-                                borderBottom: `${workSpaceTheme.border.width}px solid ${workSpaceTheme.border.color}`,
-                                backgroundColor: `rgba(${workSpaceTheme.heatmapColor.red}, ${workSpaceTheme.heatmapColor.green}, ${workSpaceTheme.heatmapColor.blue}, ${probability ?? 0})`
+                                backgroundColor: isSuggestionBox ? `rgba(255, 255, 180, ${probability ?? 1})` : `rgba(${workSpaceTheme.heatmapColor.red}, ${workSpaceTheme.heatmapColor.green}, ${workSpaceTheme.heatmapColor.blue}, ${probability ?? 0})`
                               },
                               row === 0 ? { borderTop: `${workSpaceTheme.border.width}px solid ${workSpaceTheme.border.color}` } : {},
-                              column === 0 ? { borderLeft: `${workSpaceTheme.border.width}px solid ${workSpaceTheme.border.color}` } : {}
+                              column === 0 ? { borderLeft: `${workSpaceTheme.border.width}px solid ${workSpaceTheme.border.color}` } : {},
+                              row === workSpaceConfig.x.n_segments - 1 ? { borderBottom: `${workSpaceTheme.border.width}px solid ${workSpaceTheme.border.color}` } : {},
+                              column === workSpaceConfig.y.n_segments - 1 ? { borderRight: `${workSpaceTheme.border.width}px solid ${workSpaceTheme.border.color}` } : {}
                             )}
                           />                            
                         )
@@ -702,7 +740,7 @@ function App() {
                   plans={plans}
                 />
               )}
-              {nextDemonstrationToRender.map(([x, y], index) =>
+              {/* nextDemonstrationToRender.map(([x, y], index) =>
                 <span
                   key={index}
                   style={{
@@ -712,7 +750,7 @@ function App() {
                     left: (workSpaceConfig.y.max - y) * workSpaceTheme.scale - workSpaceTheme.taskInstance.size / 2,
                   }}
                 />
-              )}
+              ) */}
               {demonstrationsToRender.map(([x, y, z, { id, score, joint_angles }], index) =>
                 <span
                   key={index}
@@ -832,15 +870,15 @@ function App() {
                   <div style={{ position: 'relative' }}>
                     <span className='material-symbols-rounded' title='Reset saved demonstrations' style={{ cursor: 'pointer', fontSize: 40 }} onClick={() => {
                       sessionStorage.removeItem('demonstrations')
-                      setDemonstrationAvailable(false)
-                      setConfidenceMessage('')
                       setObjectPose(null)
-                      setObjectPoseDetected(false)
+                      setConfidenceMessage('')
                       setObjectPoseValid(false)
                       setProbabilityHeatMap({})
+                      setObjectPoseDetected(false)
                       setTaskInstancesToRender([])
                       setDemonstrationsToRender([])
                       setNextDemonstrationToRender([])
+                      setDemonstrationAvailable(false)
                     }}>
                       delete
                       <span className='material-symbols-rounded' style={{ position: 'absolute', bottom: 0, right: 0 }}>scatter_plot</span>
@@ -853,17 +891,17 @@ function App() {
                   <span className='material-symbols-rounded' title='Reset the robot configuration' style={{ cursor: 'pointer', fontSize: 40 }} onClick={() => {
                     localStorage.clear()
                     sessionStorage.clear()
-                    setRobotConfigAvailable(false)
-                    setDemoConfigAvailable(false)
-                    setDemonstrationAvailable(false)
-                    setConfidenceMessage('')
                     setObjectPose(null)
-                    setObjectPoseDetected(false)
+                    setConfidenceMessage('')
                     setObjectPoseValid(false)
                     setProbabilityHeatMap({})
+                    setObjectPoseDetected(false)
                     setTaskInstancesToRender([])
+                    setDemoConfigAvailable(false)
                     setDemonstrationsToRender([])
+                    setRobotConfigAvailable(false)
                     setNextDemonstrationToRender([])
+                    setDemonstrationAvailable(false)
                   }}>
                     delete
                     <span className='material-symbols-rounded' style={{ position: 'absolute', bottom: 0, right: 0 }}>precision_manufacturing</span>
@@ -881,7 +919,14 @@ function App() {
                   })
                   console.log('======== Intermediate Times ========')
                   const times = JSON.parse(sessionStorage.getItem('intermediate-times') ?? [])
-                  console.table(times.map(({ probability, timestamp }, index, array) => ({ Probability: probability / 100, 'Time taken (ms)': index === 0 ? 0 : timestamp - array[0].timestamp })))
+                  console.table(times.map(({ probability, timestamp, pose_estimation_time, simulation_time, demonstration_preparation_time, demonstration_acquisition_time }, index, array) => ({
+                    Probability: probability / 100,
+                    '(A) Total Time (ms)': index === 0 ? timestamp - parseInt(sessionStorage.getItem('start-time')) : timestamp - array[index-1].timestamp,
+                    '(B) Pose Detection Time (ms)': index === 0 ? pose_estimation_time : pose_estimation_time - array[index-1].pose_estimation_time,
+                    '(C) Demonstration Preparation Time (ms)': index === 0 ? demonstration_preparation_time : demonstration_preparation_time - array[index-1].demonstration_preparation_time,
+                    '(D) Demonstration Acquisition Time (ms)': index === 0 ? demonstration_acquisition_time : demonstration_acquisition_time - array[index-1].demonstration_acquisition_time,
+                    '(E) Simulation Time (ms)': index === 0 ? simulation_time : simulation_time - array[index-1].simulation_time
+                  })))
                 }}>
                   timer
                 </span>
@@ -922,12 +967,12 @@ function App() {
                           style={Object.assign(
                             {
                               width: cellWidth,
-                              height: cellHeight,
-                              borderRight: '1px solid white',
-                              borderBottom: '1px solid white'
+                              height: cellHeight
                             },
                             row === 0 ? { borderTop: '1px solid white' } : {},
-                            column === 0 ? { borderLeft: '1px solid white' } : {}
+                            column === 0 ? { borderLeft: '1px solid white' } : {},
+                            row === workSpaceConfig.x.n_segments - 1 ? { borderBottom: '1px solid white' } : {},
+                            column === workSpaceConfig.y.n_segments - 1 ? { borderRight: '1px solid white' } : {}
                           )}
                         />                            
                       )
