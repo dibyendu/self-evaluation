@@ -927,6 +927,17 @@ function App() {
                     '(D) Demonstration Acquisition Time (ms)': index === 0 ? demonstration_acquisition_time : demonstration_acquisition_time - array[index-1].demonstration_acquisition_time,
                     '(E) Simulation Time (ms)': index === 0 ? simulation_time : simulation_time - array[index-1].simulation_time
                   })))
+
+                  const overall_time = `(A) Total Time,(B) Pose Detection Time,(C) Demonstration Preparation Time,(D) Demonstration Acquisition Time,(E) Simulation Time\n${parseInt(sessionStorage.getItem('end-time')) - parseInt(sessionStorage.getItem('start-time'))},${parseInt(sessionStorage.getItem('pose-estimation-time'))},${parseInt(sessionStorage.getItem('demonstration-preparation-time'))},${parseInt(sessionStorage.getItem('demonstration-acquisition-time'))},${parseInt(sessionStorage.getItem('simulation-time'))}`
+                  let intermediate_times = `Probability,(A) Total Time (ms),(B) Pose Detection Time (ms),(C) Demonstration Preparation Time (ms),(D) Demonstration Acquisition Time (ms),(E) Simulation Time (ms)\n`
+                  intermediate_times += times.map(({ probability, timestamp, pose_estimation_time, simulation_time, demonstration_preparation_time, demonstration_acquisition_time }, index, array) =>
+                    `${probability / 100},${index === 0 ? timestamp - parseInt(sessionStorage.getItem('start-time')) : timestamp - array[index-1].timestamp},${index === 0 ? pose_estimation_time : pose_estimation_time - array[index-1].pose_estimation_time},${index === 0 ? demonstration_preparation_time : demonstration_preparation_time - array[index-1].demonstration_preparation_time},${index === 0 ? demonstration_acquisition_time : demonstration_acquisition_time - array[index-1].demonstration_acquisition_time},${index === 0 ? simulation_time : simulation_time - array[index-1].simulation_time}`
+                  ).join('\n')
+
+                  const zip = new JSZip()
+                  zip.file('overall_time.csv', overall_time)
+                  zip.file('intermediate_times.csv', intermediate_times)
+                  zip.generateAsync({ type: 'blob' }).then(content => FileSaver.saveAs(content, 'times.zip'))
                 }}>
                   timer
                 </span>
