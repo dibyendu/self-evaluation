@@ -255,6 +255,8 @@ function App() {
 
   const [demonstrationProcessPID, setDemonstrationProcessPID] = useState(null)
 
+  const [currentTask, setCurrentTask] = useState('pouring')
+
   const [miniMapEnabled, setMiniMapEnabled] = useState(false)
 
   const [objectPose, setObjectPose] = useState(null)
@@ -396,7 +398,8 @@ function App() {
               if (!isActive) {
                 sessionStorage.setItem('start-demonstration-preparation-time', `${Date.now()}`)
                 startAction(() => {
-                  const { initial_joint_config } = JSON.parse(sessionStorage.getItem(demonstrationConfigurationFile))
+                  const { pouring, scooping } = JSON.parse(sessionStorage.getItem(demonstrationConfigurationFile))
+                  const initial_joint_config = currentTask === 'pouring' ? pouring : scooping
                   return fetch(`${backEndHost}/start`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -469,7 +472,8 @@ function App() {
                       region_of_interest: demo.roi
                     }))
 
-                    const { initial_joint_config, n_objects, dimensions } = workSpaceConfig
+                    const { pouring, scooping, n_objects, dimensions } = workSpaceConfig
+                    const initial_joint_config = currentTask === 'pouring' ? pouring : scooping
                     /*
                       dimensions = [
                         {'name': 'x',   'min': 0.6602,    'max': 1.2602,      'n_segments': 4},
@@ -812,15 +816,15 @@ function App() {
                         dimensions: config.dimensions.map(d => d.name === 'x' ? { ...d, n_segments: parseInt(value) } : d),
                         x: { ...config.x, n_segments: parseInt(value) }
                       }))
-                      setDemonstrationAvailable(false)
-                      setConfidenceMessage('')
                       setObjectPose(null)
-                      setObjectPoseDetected(false)
+                      setConfidenceMessage('')
                       setObjectPoseValid(false)
                       setProbabilityHeatMap({})
+                      setObjectPoseDetected(false)
                       setTaskInstancesToRender([])
                       setDemonstrationsToRender([])
                       setNextDemonstrationToRender([])
+                      setDemonstrationAvailable(false)
                       sessionStorage.removeItem('demonstrations')
                     }}>
                       {
@@ -853,6 +857,26 @@ function App() {
                         [1,2,3,4,5].map((val, index) =>
                           <option key={index} value={val}>{val}</option>
                         )
+                      }
+                    </select>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'row', justifyContent: 'space-between' }}>
+                    <label htmlFor='tasks' style={{ marginRight: 10 }}>Task</label>
+                    <select id='tasks' defaultValue={currentTask} onChange={({ target: { value }}) => {
+                      setObjectPose(null)
+                      setCurrentTask(value)
+                      setConfidenceMessage('')
+                      setObjectPoseValid(false)
+                      setProbabilityHeatMap({})
+                      setObjectPoseDetected(false)
+                      setTaskInstancesToRender([])
+                      setDemonstrationsToRender([])
+                      setNextDemonstrationToRender([])
+                      setDemonstrationAvailable(false)
+                      sessionStorage.removeItem('demonstrations')
+                    }}>
+                      {
+                        ['pouring', 'scooping'].map((val, index) => <option key={index} value={val}>{val}</option>)
                       }
                     </select>
                   </div>
