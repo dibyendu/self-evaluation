@@ -228,7 +228,7 @@ function calculateTimeElapsed(key) {
 
 
 function App() {
-
+  const indexDBRef = useRef(null)
   const firstCellRef = useRef(null)
   const draggableRef = useRef(null)
 
@@ -298,8 +298,19 @@ function App() {
         )
       })
     }
+    let indexedDbOpenRequest = indexedDB.open('demonstration-db', 1)
+    const openIndexDb = () => {
+      indexDBRef.current = indexedDbOpenRequest.result
+      if (!indexDBRef.current.objectStoreNames.contains('demonstrations'))
+        indexDBRef.current.createObjectStore('demonstrations', { keyPath: 'id' })
+    }
+    indexedDbOpenRequest.onerror = () => console.error(indexedDbOpenRequest.error)
+    indexedDbOpenRequest.onsuccess = openIndexDb
+    indexedDbOpenRequest.onupgradeneeded = openIndexDb
     setDemoConfigAvailable(config !== null)
     setDemonstrationAvailable(sessionStorage.getItem('demonstrations') !== null)
+
+    return () => indexDBRef.current.close()
   }, [])
 
 
@@ -428,7 +439,7 @@ function App() {
                     if (response.ok)
                       return response.json()
                   })
-                  .then(({ demonstration, pose = { x: objectPose.x, y: objectPose.y }}) => {
+                  .then(async ({ demonstration, pose = { x: objectPose.x, y: objectPose.y }}) => {
                     sessionStorage.setItem('start-simulation-time', `${Date.now()}`)
                     const objectLocation = nj.array([
                       [ 1, 0, 0,  pose.x              ],
@@ -438,9 +449,21 @@ function App() {
                     ]).tolist().map(row => row.join(',')).join('\r\n')
 
                     const savedDemonstrations = {},
+                          transaction = indexDBRef.current.transaction('demonstrations', 'readwrite'),
+                          demonstrationStore = transaction.objectStore('demonstrations'),
                           demonstrationsCount = parseInt(sessionStorage.getItem('demonstrations') ?? '0')
-                    for (let i = 0; i < demonstrationsCount; i++)
-                      savedDemonstrations[i+1] = JSON.parse(sessionStorage.getItem(`demonstration-${i+1}`))
+
+                    await Promise.all(new Array(demonstrationsCount).fill(null).map((_, i) => {
+                      return new Promise((resolve, reject) => {
+                        const request = demonstrationStore.get(`demonstration-${i+1}`)
+                        request.onsuccess = () => {
+                          const { result: { data }} = request
+                          savedDemonstrations[i+1] = data
+                          resolve()
+                        }
+                      })
+                    }))
+                    console.log(savedDemonstrations)
 
                     let joint_limits = localStorage.getItem('joint_limits')
                     joint_limits = nj.array(joint_limits.split('\n').map(row => row.split(',').map(cell => parseFloat(cell))))
@@ -461,8 +484,8 @@ function App() {
                     setObjectPose(null)
                     setObjectPoseValid(false)
                     setObjectPoseDetected(false)
-                    sessionStorage.setItem('demonstrations', `${demonstrationsCount + 1}`)
-                    sessionStorage.setItem(`demonstration-${demonstrationsCount + 1}`, JSON.stringify(savedDemonstrations[index]))
+                    sessionStorage.setItem('demonstrations', `${demonstrationsCount+1}`)
+                    demonstrationStore.add({ id: `demonstration-${demonstrationsCount+1}`, data: savedDemonstrations[index] })
 
                     const demonstrations = Object.entries(savedDemonstrations).map(([index, demo]) => ({
                       id: parseInt(index),
@@ -893,7 +916,6 @@ function App() {
                   </div>
                   <div style={{ position: 'relative' }}>
                     <span className='material-symbols-rounded' title='Reset saved demonstrations' style={{ cursor: 'pointer', fontSize: 40 }} onClick={() => {
-                      sessionStorage.removeItem('demonstrations')
                       setObjectPose(null)
                       setConfidenceMessage('')
                       setObjectPoseValid(false)
@@ -903,6 +925,7 @@ function App() {
                       setDemonstrationsToRender([])
                       setNextDemonstrationToRender([])
                       setDemonstrationAvailable(false)
+                      sessionStorage.removeItem('demonstrations')
                     }}>
                       delete
                       <span className='material-symbols-rounded' style={{ position: 'absolute', bottom: 0, right: 0 }}>scatter_plot</span>
