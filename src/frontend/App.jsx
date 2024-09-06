@@ -345,7 +345,7 @@ function App() {
         setObjectPose({ x, y })
         setObjectPoseValid(
           (
-            workSpaceConfig.x.max - workSpaceConfig.buffer >= x && x >= workSpaceConfig.x.min && workSpaceConfig.y.max >= y && y >= workSpaceConfig.y.min + workSpaceConfig.buffer
+            workSpaceConfig.x.max >= x && x >= workSpaceConfig.x.min && workSpaceConfig.y.max >= y && y >= workSpaceConfig.y.min
           ) && (
             nextDemonstrationToRender.length === 0 ||
             // nextDemonstrationToRender.some(([xn, yn]) => Math.sqrt(Math.abs((xn - x)**2) + Math.abs((yn - y)**2)) * 100 <= permissibleRadius)
@@ -642,7 +642,7 @@ function App() {
                       toast.error(message, { style: { borderRadius: 10, background: '#333', color: '#fff' }})
                     }
                     const isValid = (
-                      workSpaceConfig.x.max - workSpaceConfig.buffer >= x && x >= workSpaceConfig.x.min && workSpaceConfig.y.max >= y && y >= workSpaceConfig.y.min + workSpaceConfig.buffer
+                      workSpaceConfig.x.max >= x && x >= workSpaceConfig.x.min && workSpaceConfig.y.max >= y && y >= workSpaceConfig.y.min
                     ) && (
                       nextDemonstrationToRender.length === 0 ||
                       // nextDemonstrationToRender.some(([xn, yn]) => Math.sqrt(Math.abs((xn - x)**2) + Math.abs((yn - y)**2)) * 100 <= permissibleRadius)
