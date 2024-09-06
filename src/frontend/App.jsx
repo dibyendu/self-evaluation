@@ -925,7 +925,8 @@ function App() {
                       setDemonstrationsToRender([])
                       setNextDemonstrationToRender([])
                       setDemonstrationAvailable(false)
-                      sessionStorage.removeItem('demonstrations')
+                      sessionStorage.clear()
+                      indexDBRef.current.transaction('demonstrations', 'readwrite').objectStore('demonstrations').clear()
                     }}>
                       delete
                       <span className='material-symbols-rounded' style={{ position: 'absolute', bottom: 0, right: 0 }}>scatter_plot</span>
@@ -936,8 +937,6 @@ function App() {
               {demoConfigAvailable && robotConfigAvailable && (
                 <div style={{ position: 'relative' }}>
                   <span className='material-symbols-rounded' title='Reset the robot configuration' style={{ cursor: 'pointer', fontSize: 40 }} onClick={() => {
-                    localStorage.clear()
-                    sessionStorage.clear()
                     setObjectPose(null)
                     setConfidenceMessage('')
                     setObjectPoseValid(false)
@@ -949,6 +948,9 @@ function App() {
                     setRobotConfigAvailable(false)
                     setNextDemonstrationToRender([])
                     setDemonstrationAvailable(false)
+                    localStorage.clear()
+                    sessionStorage.clear()
+                    indexDBRef.current.transaction('demonstrations', 'readwrite').objectStore('demonstrations').clear()
                   }}>
                     delete
                     <span className='material-symbols-rounded' style={{ position: 'absolute', bottom: 0, right: 0 }}>precision_manufacturing</span>
