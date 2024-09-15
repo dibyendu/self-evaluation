@@ -414,7 +414,7 @@ function App() {
                   return fetch(`${backEndHost}/start`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ joint_config: initial_joint_config, wait_time: waitTime, object_location: objectPose })
+                    body: JSON.stringify({ joint_config: initial_joint_config, wait_time: waitTime, object_location: objectPose, task: currentTask })
                   })
                   .then(response => {
                     calculateTimeElapsed('demonstration-preparation-time')
