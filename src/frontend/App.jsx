@@ -438,7 +438,7 @@ function App() {
                 calculateTimeElapsed('demonstration-acquisition-time')
                 sessionStorage.setItem('start-demonstration-preparation-time', `${Date.now()}`)
                 startAction(() =>
-                  fetch(`${backEndHost}/stop/${demonstrationProcessPID}` {
+                  fetch(`${backEndHost}/stop/${demonstrationProcessPID}`, {
                     method: 'GET',
                     headers: { 'X-Self-Evaluation-Task': currentTask === 'pouring' ? 'pour' : 'scoop' }
                   })
