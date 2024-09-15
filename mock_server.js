@@ -2,7 +2,7 @@ import { oakCors } from 'https://deno.land/x/cors/mod.ts'
 import { Application, Router, Status } from 'https://deno.land/x/oak/mod.ts'
 
 
-const demonstrations_path = 'demonstrations/pour'
+const demonstrations_path = 'demonstrations'
 
 const config = JSON.parse(Deno.readTextFileSync('demonstration_config.json')),
       {min: xMin, max: xMax} = config.dimensions.find(c => c.name === 'x'),
@@ -53,11 +53,11 @@ router
   context.response.body = { success: true, x: meanX, y: meanY, variance: [varX, varY] }
 })
 .post('/start', async context => {    
-  const { object_location: { x, y }} = await context.request.body.json()
+  const { object_location: { x, y }, task } = await context.request.body.json()
   let demoIndex = 1
   let minDistance = Number.MAX_VALUE
-  for await (const dirEntry of Deno.readDir(demonstrations_path)) {
-    const pose = Deno.readTextFileSync(`${demonstrations_path}/${dirEntry.name}/object_poses.csv`),
+  for await (const dirEntry of Deno.readDir(`${demonstrations_path}/interactive_${task}`)) {
+    const pose = Deno.readTextFileSync(`${demonstrations_path}/interactive_${task}/${dirEntry.name}/object_poses.csv`),
           [demoX, demoY] = pose.split('\n').slice(0, 2).map(str => parseFloat(str.trim().split(',').at(-1))),
           dist = (x - demoX)**2 + (y - demoY)**2
     if (dist < minDistance) {
@@ -68,9 +68,9 @@ router
   context.response.body = { pid: demoIndex }
 })
 .get('/stop/:index', context => {
-  const pose = Deno.readTextFileSync(`${demonstrations_path}/demo${context.params.index}/object_poses.csv`),
+  const pose = Deno.readTextFileSync(`${demonstrations_path}/interactive_${task}/demo${context.params.index}/object_poses.csv`),
         [demoX, demoY] = pose.split('\n').slice(0, 2).map(str => parseFloat(str.trim().split(',').at(-1))),
-        demonstration = Deno.readTextFileSync(`${demonstrations_path}/demo${context.params.index}/joint_angles.csv`)
+        demonstration = Deno.readTextFileSync(`${demonstrations_path}/interactive_${task}/demo${context.params.index}/joint_angles.csv`)
   context.response.body = { demonstration, pose: { x: demoX, y: demoY }}
 })
 
