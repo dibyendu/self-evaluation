@@ -415,10 +415,9 @@ function App() {
                     method: 'POST',
                     headers: {
                       'Content-Type': 'application/json',
-                      'X-Self-Evaluation-Object-Location': JSON.stringify(objectPose),
-                      'X-Self-Evaluation-Task': currentTask === 'pouring' ? 'pour' : 'scoop'
+                      'Self-Evaluation-Object-Location': JSON.stringify(objectPose),
+                      'Self-Evaluation-Task': currentTask === 'pouring' ? 'pour' : 'scoop'
                     },
-                    // object_location: objectPose, task: currentTask === 'pouring' ? 'pour' : 'scoop'
                     body: JSON.stringify({ joint_config: initial_joint_config, wait_time: waitTime })
                   })
                   .then(response => {
@@ -440,7 +439,7 @@ function App() {
                 startAction(() =>
                   fetch(`${backEndHost}/stop/${demonstrationProcessPID}`, {
                     method: 'GET',
-                    headers: { 'X-Self-Evaluation-Task': currentTask === 'pouring' ? 'pour' : 'scoop' }
+                    headers: { 'Self-Evaluation-Task': currentTask === 'pouring' ? 'pour' : 'scoop' }
                   })
                   .then(response => {
                     calculateTimeElapsed('demonstration-preparation-time')
