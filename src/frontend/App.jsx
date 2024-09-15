@@ -413,8 +413,13 @@ function App() {
                   const initial_joint_config = currentTask === 'pouring' ? pouring : scooping
                   return fetch(`${backEndHost}/start`, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ joint_config: initial_joint_config, wait_time: waitTime, object_location: objectPose, task: currentTask === 'pouring' ? 'pour' : 'scoop' })
+                    headers: {
+                      'Content-Type': 'application/json',
+                      'X-Self-Evaluation-Object-Location': JSON.stringify(objectPose),
+                      'X-Self-Evaluation-Task': currentTask === 'pouring' ? 'pour' : 'scoop'
+                    },
+                    // object_location: objectPose, task: currentTask === 'pouring' ? 'pour' : 'scoop'
+                    body: JSON.stringify({ joint_config: initial_joint_config, wait_time: waitTime })
                   })
                   .then(response => {
                     calculateTimeElapsed('demonstration-preparation-time')
@@ -433,7 +438,10 @@ function App() {
                 calculateTimeElapsed('demonstration-acquisition-time')
                 sessionStorage.setItem('start-demonstration-preparation-time', `${Date.now()}`)
                 startAction(() =>
-                  fetch(`${backEndHost}/stop/${demonstrationProcessPID}`)
+                  fetch(`${backEndHost}/stop/${demonstrationProcessPID}` {
+                    method: 'GET',
+                    headers: { 'X-Self-Evaluation-Task': currentTask === 'pouring' ? 'pour' : 'scoop' }
+                  })
                   .then(response => {
                     calculateTimeElapsed('demonstration-preparation-time')
                     if (response.ok)
