@@ -53,9 +53,8 @@ router
   context.response.body = { success: true, x: meanX, y: meanY, variance: [varX, varY] }
 })
 .post('/start', async context => {    
-  // const { object_location: { x, y }, task } = await context.request.body.json()
-  const task = context.request.headers.get('X-Self-Evaluation-Task')
-  const { x, y } = JSON.parse(context.request.headers.get('X-Self-Evaluation-Object-Location'))
+  const task = context.request.headers.get('Self-Evaluation-Task')
+  const { x, y } = JSON.parse(context.request.headers.get('Self-Evaluation-Object-Location'))
   let demoIndex = 1
   let minDistance = Number.MAX_VALUE
   for await (const dirEntry of Deno.readDir(`${demonstrations_path}/interactive_${task}`)) {
@@ -70,7 +69,7 @@ router
   context.response.body = { pid: demoIndex }
 })
 .get('/stop/:index', context => {
-  const task = context.request.headers.get('X-Self-Evaluation-Task')
+  const task = context.request.headers.get('Self-Evaluation-Task')
   const pose = Deno.readTextFileSync(`${demonstrations_path}/interactive_${task}/demo${context.params.index}/object_poses.csv`),
         [demoX, demoY] = pose.split('\n').slice(0, 2).map(str => parseFloat(str.trim().split(',').at(-1))),
         demonstration = Deno.readTextFileSync(`${demonstrations_path}/interactive_${task}/demo${context.params.index}/joint_angles.csv`)
