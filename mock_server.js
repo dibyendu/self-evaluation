@@ -57,8 +57,8 @@ router
   const { x, y } = JSON.parse(context.request.headers.get('Self-Evaluation-Object-Location'))
   let demoIndex = 1
   let minDistance = Number.MAX_VALUE
-  for await (const dirEntry of Deno.readDir(`${demonstrations_path}/${task}`)) {
-    const pose = Deno.readTextFileSync(`${demonstrations_path}/${task}/${dirEntry.name}/object_poses.csv`),
+  for await (const dirEntry of Deno.readDir(`${demonstrations_path}/interactive_${task}`)) {
+    const pose = Deno.readTextFileSync(`${demonstrations_path}/interactive_${task}/${dirEntry.name}/object_poses.csv`),
           [demoX, demoY] = pose.split('\n').slice(0, 2).map(str => parseFloat(str.trim().split(',').at(-1))),
           dist = (x - demoX)**2 + (y - demoY)**2
     if (dist < minDistance) {
@@ -70,9 +70,9 @@ router
 })
 .get('/stop/:index', context => {
   const task = context.request.headers.get('Self-Evaluation-Task')
-  const pose = Deno.readTextFileSync(`${demonstrations_path}/${task}/demo${context.params.index}/object_poses.csv`),
+  const pose = Deno.readTextFileSync(`${demonstrations_path}/interactive_${task}/demo${context.params.index}/object_poses.csv`),
         [demoX, demoY] = pose.split('\n').slice(0, 2).map(str => parseFloat(str.trim().split(',').at(-1))),
-        demonstration = Deno.readTextFileSync(`${demonstrations_path}/${task}/demo${context.params.index}/joint_angles.csv`)
+        demonstration = Deno.readTextFileSync(`${demonstrations_path}/interactive_${task}/demo${context.params.index}/joint_angles.csv`)
   context.response.body = { demonstration, pose: { x: demoX, y: demoY }}
 })
 
