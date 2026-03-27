@@ -55,7 +55,6 @@ jobs:
         id: deployment
         uses: actions/deploy-pages@v4
 
-
   deploy-mock-server:
     runs-on: ubuntu-latest
     steps:
@@ -69,4 +68,4 @@ jobs:
 
       - name: Deploy to Deno Deploy
         run: |
-            deno deploy --org dibyendu --app bandit-mock-server --prod --token ${{ secrets.DENO_DEPLOY_TOKEN }}
+            deno deploy --prod --token ${{ secrets.DENO_DEPLOY_TOKEN }}
