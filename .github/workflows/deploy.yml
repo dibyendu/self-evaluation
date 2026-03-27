@@ -63,12 +63,10 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Install Deno
-        uses: denoland/setup-deno@v1
+        uses: denoland/setup-deno@v2
         with:
-          deno-version: v1.45.5
+          deno-version: lts
 
       - name: Deploy to Deno Deploy
-        uses: denoland/deployctl@v1
-        with:
-          project: bandit-mock-server
-          entrypoint: mock_server.js
+        run: |
+            deno deploy --prod
