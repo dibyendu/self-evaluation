@@ -69,4 +69,4 @@ jobs:
 
       - name: Deploy to Deno Deploy
         run: |
-            deno deploy --prod --token ${{ secrets.DENO_DEPLOY_TOKEN }}
+            deno deploy --org dibyendu --app bandit-mock-server --prod --token ${{ secrets.DENO_DEPLOY_TOKEN }}
