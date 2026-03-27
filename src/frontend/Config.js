@@ -27,4 +27,4 @@ export const demonstrationFiles = {
   roi: 'region_of_interest.txt'
 }
 
-export const backEndHost = 'https://bandit-mock-server.dibyendu.deno.net/'
+export const backEndHost = 'https://bandit-mock-server.dibyendu.deno.net'
